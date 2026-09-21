@@ -89,8 +89,12 @@
         window.addEventListener("error", (event) => {
           if (event.message) fail("O EmulatorJS encontrou um erro ao carregar o jogo.");
         });
-        window.addEventListener("unhandledrejection", () => {
-          fail("A ROM não pôde ser carregada ou seu formato não é suportado.");
+        window.addEventListener("unhandledrejection", (event) => {
+          const detail = event.reason instanceof Error
+            ? event.reason.message
+            : typeof event.reason === "string" ? event.reason : "erro interno sem detalhes";
+          console.error("Falha não tratada no EmulatorJS:", event.reason);
+          fail(`A ROM não pôde ser carregada. Detalhe: ${detail}`);
         });
 
         const verifyRemoteRom = async () => {
@@ -129,8 +133,15 @@
           window.EJS_core = core;
           window.EJS_gameUrl = rom;
           window.EJS_gameName = name;
-          // Fixar a versão evita que uma atualização do CDN quebre os cores em produção.
-          window.EJS_pathtodata = "https://cdn.emulatorjs.org/4.2.3/data/";
+          // O core PCSX da versão estável é anterior à correção de travamentos
+          // em jogos japoneses. Os demais sistemas permanecem na versão estável.
+          const emulatorVersion = core === "pcsx_rearmed" ? "4.3.0-pre" : "4.2.3";
+          window.EJS_pathtodata = `https://cdn.emulatorjs.org/${emulatorVersion}/data/`;
+          if (core === "pcsx_rearmed") {
+            // Sem uma BIOS oficial fornecida pelo usuário, força a BIOS HLE do core.
+            // O modo Auto de builds antigos pode selecionar uma região incorreta.
+            window.EJS_defaultOptions = { pcsx_rearmed_bios: "HLE" };
+          }
           window.EJS_startOnLoaded = true;
           window.EJS_backgroundColor = "#050609";
           window.EJS_color = "#8b6cff";

@@ -85,9 +85,9 @@ O contrato principal não conhece a hospedagem da ROM:
 <GamePlayer platform="snes" romUrl="URL_DA_ROM" />
 ```
 
-O player usa os cores Libretro distribuídos pelo EmulatorJS 4.2.3. A versão do CDN é fixada para que uma atualização externa não altere o funcionamento do site sem uma nova publicação.
+O player usa os cores Libretro distribuídos pelo EmulatorJS. SNES e N64 permanecem na versão estável 4.2.3; o PS1 usa o build 4.3.0-pre, que contém uma versão mais recente do PCSX-ReARMed com correções para jogos japoneses. As versões do CDN são fixadas para que uma atualização externa não altere o funcionamento do site sem uma nova publicação.
 
-O PS1 usa `pcsx_rearmed`, que possui BIOS HLE e não exige que o site distribua o arquivo protegido `scph5500.bin`. No N64, a barra do player permite alternar entre Mupen64Plus e ParaLLEl. O segundo é uma opção de compatibilidade para jogos, GPUs ou drivers que exibem tela preta no Mupen64Plus. Quando WebGL 2 não existe, a troca para ParaLLEl é automática.
+O PS1 usa `pcsx_rearmed` com a BIOS HLE explicitamente selecionada e não exige que o site distribua o arquivo protegido `scph5500.bin`. No N64, a barra do player permite alternar entre Mupen64Plus e ParaLLEl. O segundo é uma opção de compatibilidade para jogos, GPUs ou drivers que exibem tela preta no Mupen64Plus. Quando WebGL 2 não existe, a troca para ParaLLEl é automática.
 
 ## Salvamentos
 
