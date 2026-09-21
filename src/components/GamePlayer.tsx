@@ -6,6 +6,7 @@ import type { Platform } from "../types/game";
 interface GamePlayerProps {
   platform: Platform;
   romUrl: string;
+  gameId: string;
   gameName?: string;
   core?: string;
   playerRef?: Ref<EmulatorJSPlayerHandle>;
@@ -16,6 +17,7 @@ interface GamePlayerProps {
 export function GamePlayer({
   platform,
   romUrl,
+  gameId,
   gameName = "Jogo",
   core,
   playerRef,
@@ -31,6 +33,7 @@ export function GamePlayer({
       ref={playerRef}
       platform={platform}
       romUrl={romUrl}
+      gameId={gameId}
       gameName={gameName}
       core={core}
       onReady={onReady}

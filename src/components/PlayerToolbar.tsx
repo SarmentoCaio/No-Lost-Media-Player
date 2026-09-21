@@ -137,6 +137,18 @@ export function PlayerToolbar({
     }
   };
 
+  const openNetplay = async () => {
+    if (!emulatorRef.current) return;
+    setBusy(true);
+    try {
+      await emulatorRef.current.openNetplay();
+    } catch (error) {
+      onError(error instanceof Error ? error.message : "Não foi possível abrir as salas online.");
+    } finally {
+      setBusy(false);
+    }
+  };
+
   const chooseDirectory = async () => {
     try {
       await selectDirectory();
@@ -178,6 +190,15 @@ export function PlayerToolbar({
             {N64_CORES.map((core) => <option key={core.value} value={core.value}>{core.label}</option>)}
           </select>
         )}
+        <button
+          type="button"
+          className="toolbar-button toolbar-button--online"
+          onClick={openNetplay}
+          disabled={!playerReady || busy}
+          title="Crie uma sala ou entre na sala de outro jogador"
+        >
+          Jogar online
+        </button>
         <button type="button" className="toolbar-button" onClick={chooseDirectory} disabled={busy}>
           Pasta
         </button>

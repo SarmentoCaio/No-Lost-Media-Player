@@ -40,6 +40,8 @@
         let core = params.get("core");
         const rom = params.get("rom");
         const name = params.get("name") || "Jogo";
+        const gameId = Number(params.get("gameId"));
+        const netplayServer = params.get("netplayServer");
         let shuttingDown = false;
         let pausedInBackground = false;
 
@@ -54,12 +56,20 @@
           try { emulator.pause?.(true); } catch (error) { console.warn(error); }
           try { emulator.gameManager?.toggleMainLoop?.(0); } catch (error) { console.warn(error); }
           try { emulator.Module?.AL?.currentCtx?.audioCtx?.suspend?.(); } catch (error) { console.warn(error); }
+          try { emulator.netplay?.leaveRoom?.(); } catch (error) { console.warn(error); }
           try { emulator.callEvent?.("exit"); } catch (error) { console.warn(error); }
         };
 
         const syncPageVisibility = () => {
           const emulator = window.EJS_emulator;
           if (!emulator || shuttingDown) return;
+
+          // O host precisa continuar executando o jogo para transmitir áudio,
+          // vídeo e receber os comandos dos convidados quando troca de aba.
+          if (emulator.isNetplay) {
+            pausedInBackground = false;
+            return;
+          }
 
           if (document.hidden && !emulator.paused) {
             emulator.pause?.(true);
@@ -85,7 +95,7 @@
           }
         }
 
-        window.addEventListener("message", (event) => {
+        window.addEventListener("message", async (event) => {
           if (event.source !== window.parent || event.origin !== window.location.origin) return;
           const data = event.data;
           if (data?.source !== "no-lost-player") return;
@@ -98,10 +108,30 @@
           if (typeof data.requestId !== "string") return;
 
           try {
-            const gameManager = window.EJS_emulator?.gameManager;
+            const emulator = window.EJS_emulator;
+            const gameManager = emulator?.gameManager;
             if (!gameManager) throw new Error("Aguarde o jogo terminar de iniciar.");
 
-            if (data.type === "export-state") {
+            if (data.type === "open-netplay") {
+              if (!netplayServer || !Number.isSafeInteger(gameId) || gameId <= 0) {
+                throw new Error("O servidor de salas online não está configurado.");
+              }
+              if (!emulator.netplay) throw new Error("Este emulador não oferece jogo online.");
+              const controller = new AbortController();
+              const timeout = window.setTimeout(() => controller.abort(), 75000);
+              try {
+                const healthUrl = `${netplayServer.replace(/\/+$/, "")}/games`;
+                const response = await fetch(healthUrl, { signal: controller.signal });
+                if (!response.ok) throw new Error(`HTTP ${response.status}`);
+              } catch {
+                throw new Error("O servidor das salas online está indisponível. Aguarde um momento e tente novamente.");
+              } finally {
+                window.clearTimeout(timeout);
+              }
+              if (!emulator.netplay.isMenuCreated()) emulator.netplay.createNetplayMenu();
+              emulator.netplay.openMenu();
+              notify("netplay-opened", "Salas online abertas", { requestId: data.requestId });
+            } else if (data.type === "export-state") {
               if (!gameManager.supportsStates()) throw new Error("Este núcleo não oferece salvamento de estado.");
               const state = gameManager.getState();
               const stateBuffer = state instanceof Uint8Array
@@ -115,7 +145,7 @@
             }
           } catch (error) {
             notify(
-              "state-error",
+              "command-error",
               error instanceof Error ? error.message : "Falha ao acessar o salvamento.",
               { requestId: data.requestId },
             );
@@ -172,10 +202,20 @@
           window.EJS_core = core;
           window.EJS_gameUrl = rom;
           window.EJS_gameName = name;
-          // O core PCSX da versão estável é anterior à correção de travamentos
-          // em jogos japoneses. Os demais sistemas permanecem na versão estável.
-          const emulatorVersion = core === "pcsx_rearmed" ? "4.3.0-pre" : "4.2.3";
+          // O netplay está disponível a partir do 4.3.0-pre. Essa versão também
+          // contém a correção do PCSX-ReARMed usada pelos jogos japoneses.
+          const emulatorVersion = "4.3.0-pre";
           window.EJS_pathtodata = `https://cdn.emulatorjs.org/${emulatorVersion}/data/`;
+          if (netplayServer && Number.isSafeInteger(gameId) && gameId > 0) {
+            window.EJS_gameID = gameId;
+            window.EJS_netplayServer = netplayServer;
+            window.EJS_netplayICEServers = [
+              { urls: "stun:stun.l.google.com:19302" },
+              { urls: "stun:stun1.l.google.com:19302" },
+              { urls: "turn:openrelay.metered.ca:80", username: "openrelayproject", credential: "openrelayproject" },
+              { urls: "turn:openrelay.metered.ca:443", username: "openrelayproject", credential: "openrelayproject" },
+            ];
+          }
           if (core === "pcsx_rearmed") {
             // Sem uma BIOS oficial fornecida pelo usuário, força a BIOS HLE do core.
             // O modo Auto de builds antigos pode selecionar uma região incorreta.

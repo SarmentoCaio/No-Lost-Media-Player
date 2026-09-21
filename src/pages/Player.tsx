@@ -34,7 +34,7 @@ export function Player({ launch, onBack }: PlayerProps) {
       {error && (
         <div className="player-error" role="alert">
           <div>
-            <strong>Não foi possível carregar a ROM</strong>
+            <strong>Não foi possível concluir a ação</strong>
             <p>{error}</p>
           </div>
           <button type="button" onClick={() => setError(null)} aria-label="Fechar aviso">×</button>
@@ -45,6 +45,7 @@ export function Player({ launch, onBack }: PlayerProps) {
         <GamePlayer
           platform={launch.platform}
           romUrl={launch.romUrl}
+          gameId={launch.gameId}
           gameName={launch.title}
           core={launch.platform === "n64" ? n64Core : undefined}
           playerRef={emulatorRef}

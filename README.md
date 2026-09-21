@@ -85,7 +85,7 @@ O contrato principal não conhece a hospedagem da ROM:
 <GamePlayer platform="snes" romUrl="URL_DA_ROM" />
 ```
 
-O player usa os cores Libretro distribuídos pelo EmulatorJS. SNES e N64 permanecem na versão estável 4.2.3; o PS1 usa o build 4.3.0-pre, que contém uma versão mais recente do PCSX-ReARMed com correções para jogos japoneses. As versões do CDN são fixadas para que uma atualização externa não altere o funcionamento do site sem uma nova publicação.
+O player usa os cores Libretro distribuídos pelo EmulatorJS. SNES, N64 e PS1 usam o build 4.3.0-pre, necessário para as salas online e que também contém uma versão mais recente do PCSX-ReARMed com correções para jogos japoneses. A versão do CDN é fixada para que uma atualização externa não altere o funcionamento do site sem uma nova publicação.
 
 O PS1 usa `pcsx_rearmed` com a BIOS HLE explicitamente selecionada e não exige que o site distribua o arquivo protegido `scph5500.bin`. No N64, a barra do player permite alternar entre Mupen64Plus e ParaLLEl. O segundo é uma opção de compatibilidade para jogos, GPUs ou drivers que exibem tela preta no Mupen64Plus. Quando WebGL 2 não existe, a troca para ParaLLEl é automática.
 
@@ -96,6 +96,20 @@ Os botões **Salvar** e **Carregar** usam uma ponte de mensagens com o iframe do
 A seleção direta de pasta usa a File System Access API, disponível no Chrome e Edge em HTTPS (e também em `localhost`). As ROMs continuam sem ser persistidas ou enviadas pelo player.
 
 O emulador pausa automaticamente quando sua aba fica em segundo plano. Ao voltar, fechar ou navegar para fora do player, a página envia um comando explícito de encerramento ao runtime, interrompe o áudio e finaliza o loop de emulação.
+
+## Multiplayer online
+
+Depois que o jogo iniciar, o botão **Jogar online** abre o painel de netplay do EmulatorJS. O primeiro jogador informa seu nome, cria uma sala e pode definir uma senha. O segundo abre exatamente o mesmo jogo, clica em **Jogar online** e entra na sala exibida. São aceitos até quatro jogadores; cada participante controla uma porta local do console emulado.
+
+As salas são separadas por jogo e por domínio. O identificador textual recebido do catálogo é convertido em um número estável, por isso os dois participantes precisam abrir o mesmo item do catálogo (ou selecionar localmente a mesma ROM com o mesmo nome). Durante uma sessão online, a aba do anfitrião continua executando em segundo plano para não interromper a transmissão; ao fechar ou sair da página, a sala e o áudio são encerrados.
+
+O multiplayer exige um servidor de sinalização persistente, pois a hospedagem estática da Vercel não mantém conexões Socket.IO. Este repositório inclui um `render.yaml` e uma imagem em `netplay-server/Dockerfile` que executam o servidor oficial [EmulatorJS-Netplay](https://github.com/EmulatorJS/EmulatorJS-Netplay), fixado em um commit testado. Para criar o serviço padrão no Render:
+
+1. Abra `https://render.com/deploy?repo=https://github.com/SarmentoCaio/No-Lost-Media-Player`.
+2. Confirme o serviço `no-lost-media-netplay-sarmentocaio` no plano gratuito.
+3. Aguarde o endereço `https://no-lost-media-netplay-sarmentocaio.onrender.com/games` responder com `{}`.
+
+O player usa esse endereço por padrão. Para usar outro servidor, defina `VITE_NETPLAY_SERVER_URL` no ambiente de build da Vercel e publique novamente. A negociação WebRTC usa STUN do Google e TURN público do OpenRelay; em produção com maior tráfego, prefira um TURN próprio ou contratado.
 
 ## Plano para PS2
 

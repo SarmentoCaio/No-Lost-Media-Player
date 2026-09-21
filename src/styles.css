@@ -145,6 +145,8 @@ button:focus-visible, input:focus-visible, select:focus-visible { outline: 2px s
 .toolbar-button:hover:not(:disabled) { background: #222630; }
 .toolbar-button:disabled { cursor: not-allowed; opacity: .38; }
 .toolbar-button--primary { border-color: #6e58cc; background: #624ac3; color: white; }
+.toolbar-button--online { border-color: #327a61; background: #205540; color: #d9ffed; }
+.toolbar-button--online:hover:not(:disabled) { background: #286b50; }
 .toolbar-select { min-height: 38px; padding: 0 30px 0 11px; border: 1px solid #303542; border-radius: 8px; background: #171a22; color: #c8ccd5; font-size: 12px; }
 .ps2-placeholder { width: min(620px, calc(100% - 40px)); padding: 42px; border: 1px solid #292e39; border-radius: 18px; background: #11141b; text-align: center; }
 .ps2-placeholder__chip { display: inline-flex; padding: 7px 10px; border-radius: 7px; background: #40252a; color: #ff9986; font-size: 11px; font-weight: 900; letter-spacing: .12em; }

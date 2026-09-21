@@ -1,0 +1,11 @@
+services:
+  - type: web
+    name: no-lost-media-netplay-sarmentocaio
+    runtime: docker
+    plan: free
+    dockerfilePath: ./netplay-server/Dockerfile
+    dockerContext: .
+    healthCheckPath: /games
+    envVars:
+      - key: PORT
+        value: 10000

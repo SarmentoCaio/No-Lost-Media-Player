@@ -6,6 +6,7 @@ interface EmulatorJSPlayerProps {
   platform: Exclude<Platform, "ps2">;
   romUrl: string;
   gameName: string;
+  gameId: string;
   core?: string;
   onError: (message: string) => void;
   onReady?: (ready: boolean) => void;
@@ -22,6 +23,7 @@ interface EmulatorMessage {
 export interface EmulatorJSPlayerHandle {
   exportState: () => Promise<ArrayBuffer>;
   importState: (state: ArrayBuffer) => Promise<void>;
+  openNetplay: () => Promise<void>;
 }
 
 interface PendingRequest {
@@ -31,24 +33,38 @@ interface PendingRequest {
 }
 
 export const EmulatorJSPlayer = forwardRef<EmulatorJSPlayerHandle, EmulatorJSPlayerProps>(function EmulatorJSPlayer(
-  { platform, romUrl, gameName, core, onError, onReady },
+  { platform, romUrl, gameName, gameId, core, onError, onReady },
   ref,
 ) {
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const pendingRequests = useRef(new Map<string, PendingRequest>());
   const [status, setStatus] = useState("Preparando emulador…");
   const [loading, setLoading] = useState(true);
+  const netplayServer = import.meta.env.VITE_NETPLAY_SERVER_URL?.trim()
+    || "https://no-lost-media-netplay-sarmentocaio.onrender.com";
+
+  const numericGameId = useMemo(() => {
+    let hash = 2166136261;
+    const value = `${platform}:${gameId}`;
+    for (let index = 0; index < value.length; index += 1) {
+      hash ^= value.charCodeAt(index);
+      hash = Math.imul(hash, 16777619);
+    }
+    return (hash >>> 0) || 1;
+  }, [gameId, platform]);
 
   const emulatorUrl = useMemo(() => {
     const parameters = new URLSearchParams({
       core: core ?? emulatorConfig[platform].core,
       rom: romUrl,
       name: gameName,
+      gameId: String(numericGameId),
+      netplayServer,
     });
     return `/emulator/emulatorjs/index.html?${parameters.toString()}`;
-  }, [core, gameName, platform, romUrl]);
+  }, [core, gameName, netplayServer, numericGameId, platform, romUrl]);
 
-  const sendCommand = (type: "export-state" | "import-state", state?: ArrayBuffer) => {
+  const sendCommand = (type: "export-state" | "import-state" | "open-netplay", state?: ArrayBuffer) => {
     return new Promise<ArrayBuffer | void>((resolve, reject) => {
       const target = iframeRef.current?.contentWindow;
       if (!target) {
@@ -60,7 +76,7 @@ export const EmulatorJSPlayer = forwardRef<EmulatorJSPlayerHandle, EmulatorJSPla
       const timeout = window.setTimeout(() => {
         pendingRequests.current.delete(requestId);
         reject(new Error("O emulador demorou demais para responder."));
-      }, 30000);
+      }, type === "open-netplay" ? 90000 : 30000);
       pendingRequests.current.set(requestId, { resolve, reject, timeout });
 
       const message = { source: "no-lost-player", type, requestId, state };
@@ -77,6 +93,9 @@ export const EmulatorJSPlayer = forwardRef<EmulatorJSPlayerHandle, EmulatorJSPla
     },
     importState: async (state) => {
       await sendCommand("import-state", state);
+    },
+    openNetplay: async () => {
+      await sendCommand("open-netplay");
     },
   }), [emulatorUrl]);
 
@@ -98,14 +117,19 @@ export const EmulatorJSPlayer = forwardRef<EmulatorJSPlayerHandle, EmulatorJSPla
       } else if (data.type === "error") {
         setLoading(false);
         onError(typeof data.message === "string" ? data.message : "Não foi possível iniciar o emulador.");
-      } else if (data.type === "state-exported" || data.type === "state-imported" || data.type === "state-error") {
+      } else if (
+        data.type === "state-exported"
+        || data.type === "state-imported"
+        || data.type === "netplay-opened"
+        || data.type === "command-error"
+      ) {
         if (typeof data.requestId !== "string") return;
         const pending = pendingRequests.current.get(data.requestId);
         if (!pending) return;
         window.clearTimeout(pending.timeout);
         pendingRequests.current.delete(data.requestId);
 
-        if (data.type === "state-error") {
+        if (data.type === "command-error") {
           pending.reject(new Error(typeof data.message === "string" ? data.message : "Falha ao acessar o salvamento."));
         } else if (data.type === "state-exported") {
           if (data.state instanceof ArrayBuffer) pending.resolve(data.state);
@@ -151,7 +175,7 @@ export const EmulatorJSPlayer = forwardRef<EmulatorJSPlayerHandle, EmulatorJSPla
         className="emulator-frame"
         src={emulatorUrl}
         title={`Emulador — ${gameName}`}
-        allow="fullscreen; gamepad"
+        allow="fullscreen; gamepad; autoplay"
         allowFullScreen
         referrerPolicy="no-referrer"
       />
