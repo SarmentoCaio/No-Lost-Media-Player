@@ -1,0 +1,110 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>EmulatorJS</title>
+    <style>
+      html, body, #game { width: 100%; height: 100%; margin: 0; overflow: hidden; background: #050609; }
+      body { font-family: system-ui, sans-serif; color: #d9dce6; }
+      #fatal { box-sizing: border-box; display: none; place-content: center; width: 100%; height: 100%; padding: 2rem; text-align: center; }
+      #fatal strong { display: block; margin-bottom: .5rem; color: #ff8b8b; }
+    </style>
+  </head>
+  <body>
+    <div id="game"></div>
+    <div id="fatal" role="alert"></div>
+    <script>
+      (() => {
+        "use strict";
+
+        const notify = (type, message) => {
+          window.parent.postMessage({ source: "no-lost-emulator", type, message }, window.location.origin);
+        };
+
+        const fail = (message) => {
+          const game = document.getElementById("game");
+          const fatal = document.getElementById("fatal");
+          game.style.display = "none";
+          fatal.style.display = "grid";
+          fatal.innerHTML = "<div><strong>Falha ao iniciar o emulador</strong><span></span></div>";
+          fatal.querySelector("span").textContent = message;
+          notify("error", message);
+        };
+
+        const params = new URLSearchParams(window.location.search);
+        const core = params.get("core");
+        const rom = params.get("rom");
+        const name = params.get("name") || "Jogo";
+
+        if (!core || !rom) {
+          fail("Os parâmetros do emulador estão incompletos.");
+          return;
+        }
+
+        window.addEventListener("error", (event) => {
+          if (event.message) fail("O EmulatorJS encontrou um erro ao carregar o jogo.");
+        });
+        window.addEventListener("unhandledrejection", () => {
+          fail("A ROM não pôde ser carregada ou seu formato não é suportado.");
+        });
+
+        const verifyRemoteRom = async () => {
+          if (!/^https?:/i.test(rom)) return;
+          notify("loading", "Verificando acesso à ROM…");
+          const controller = new AbortController();
+          try {
+            const response = await fetch(rom, {
+              method: "GET",
+              headers: { Range: "bytes=0-0" },
+              signal: controller.signal,
+            });
+            if (!response.ok) {
+              throw new Error(`HTTP ${response.status}`);
+            }
+          } catch (error) {
+            if (error instanceof Error && /^HTTP /.test(error.message)) {
+              throw new Error(`A URL da ROM respondeu com erro ${error.message.replace("HTTP ", "")}.`);
+            }
+            throw new Error("O servidor da ROM não permite carregamento por outro domínio.");
+          } finally {
+            controller.abort();
+          }
+        };
+
+        const start = async () => {
+          try {
+            await verifyRemoteRom();
+          } catch (error) {
+            fail(error instanceof Error ? error.message : "Não foi possível acessar a URL da ROM.");
+            return;
+          }
+
+          notify("loading", "Carregando EmulatorJS…");
+          window.EJS_player = "#game";
+          window.EJS_core = core;
+          window.EJS_gameUrl = rom;
+          window.EJS_gameName = name;
+          window.EJS_pathtodata = "https://cdn.emulatorjs.org/stable/data/";
+          window.EJS_startOnLoaded = true;
+          window.EJS_backgroundColor = "#050609";
+          window.EJS_color = "#8b6cff";
+          window.EJS_onGameStart = () => notify("ready", "Jogo iniciado");
+
+          const loader = document.createElement("script");
+          loader.src = `${window.EJS_pathtodata}loader.js`;
+          loader.async = true;
+          loader.onload = () => {
+            notify("ready", "EmulatorJS carregado");
+          };
+          loader.onerror = () => {
+            fail("Não foi possível baixar o EmulatorJS. Verifique sua conexão com a internet.");
+          };
+          document.body.appendChild(loader);
+        };
+
+        start();
+      })();
+    </script>
+  </body>
+</html>
