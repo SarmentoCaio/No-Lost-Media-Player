@@ -3,6 +3,7 @@ import { emulatorConfig } from "../emulators/emulatorConfig";
 import type { PlayerLaunch } from "../types/game";
 import { GamePlayer } from "../components/GamePlayer";
 import { PlayerToolbar } from "../components/PlayerToolbar";
+import type { EmulatorJSPlayerHandle } from "../components/EmulatorJSPlayer";
 
 interface PlayerProps {
   launch: PlayerLaunch;
@@ -11,7 +12,10 @@ interface PlayerProps {
 
 export function Player({ launch, onBack }: PlayerProps) {
   const playerContainer = useRef<HTMLDivElement>(null);
+  const emulatorRef = useRef<EmulatorJSPlayerHandle>(null);
   const [error, setError] = useState<string | null>(null);
+  const [playerReady, setPlayerReady] = useState(false);
+  const [n64Core, setN64Core] = useState(emulatorConfig.n64.core);
   const handleError = useCallback((message: string) => setError(message), []);
 
   return (
@@ -42,11 +46,27 @@ export function Player({ launch, onBack }: PlayerProps) {
           platform={launch.platform}
           romUrl={launch.romUrl}
           gameName={launch.title}
+          core={launch.platform === "n64" ? n64Core : undefined}
+          playerRef={emulatorRef}
+          onReady={setPlayerReady}
           onError={handleError}
         />
       </div>
 
-      <PlayerToolbar playerContainer={playerContainer} onError={handleError} />
+      <PlayerToolbar
+        playerContainer={playerContainer}
+        emulatorRef={emulatorRef}
+        gameId={launch.gameId}
+        platform={launch.platform}
+        playerReady={playerReady}
+        n64Core={launch.platform === "n64" ? n64Core : undefined}
+        onN64CoreChange={launch.platform === "n64" ? (core) => {
+          setError(null);
+          setPlayerReady(false);
+          setN64Core(core);
+        } : undefined}
+        onError={handleError}
+      />
     </main>
   );
 }

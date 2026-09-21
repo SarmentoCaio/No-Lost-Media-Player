@@ -16,9 +16,9 @@
 * { box-sizing: border-box; }
 html { min-width: 320px; min-height: 100%; background: #0a0c11; }
 body { min-width: 320px; min-height: 100vh; margin: 0; }
-button, input { font: inherit; }
+button, input, select { font: inherit; }
 button { color: inherit; }
-button:focus-visible, input:focus-visible { outline: 2px solid #b9a9ff; outline-offset: 3px; }
+button:focus-visible, input:focus-visible, select:focus-visible { outline: 2px solid #b9a9ff; outline-offset: 3px; }
 
 .home-page {
   width: min(1180px, calc(100% - 48px));
@@ -133,16 +133,19 @@ button:focus-visible, input:focus-visible { outline: 2px solid #b9a9ff; outline-
 .spinner { width: 30px; height: 30px; border: 3px solid #292d38; border-top-color: var(--primary); border-radius: 50%; animation: spin .8s linear infinite; }
 @keyframes spin { to { transform: rotate(360deg); } }
 .player-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 20px; min-height: 68px; padding: 10px 24px; border-top: 1px solid #222630; background: #0d1016; }
+.toolbar-statuses { display: flex; min-width: 0; flex-direction: column; gap: 5px; }
 .gamepad-status { display: flex; min-width: 0; align-items: center; gap: 9px; color: #858b99; font-size: 12px; }
 .gamepad-status span:last-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .status-dot { width: 7px; height: 7px; flex: none; border-radius: 50%; background: #5d6370; }
 .gamepad-status--connected { color: #b8e7ce; }
 .gamepad-status--connected .status-dot { background: #53d895; box-shadow: 0 0 12px #53d895; }
-.toolbar-actions { display: flex; gap: 8px; }
+.save-directory-status { overflow: hidden; max-width: 420px; color: #737a89; font-size: 10px; text-overflow: ellipsis; white-space: nowrap; }
+.toolbar-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; }
 .toolbar-button { min-height: 38px; padding: 0 13px; border: 1px solid #303542; border-radius: 8px; background: #171a22; color: #c8ccd5; font-size: 12px; }
 .toolbar-button:hover:not(:disabled) { background: #222630; }
 .toolbar-button:disabled { cursor: not-allowed; opacity: .38; }
 .toolbar-button--primary { border-color: #6e58cc; background: #624ac3; color: white; }
+.toolbar-select { min-height: 38px; padding: 0 30px 0 11px; border: 1px solid #303542; border-radius: 8px; background: #171a22; color: #c8ccd5; font-size: 12px; }
 .ps2-placeholder { width: min(620px, calc(100% - 40px)); padding: 42px; border: 1px solid #292e39; border-radius: 18px; background: #11141b; text-align: center; }
 .ps2-placeholder__chip { display: inline-flex; padding: 7px 10px; border-radius: 7px; background: #40252a; color: #ff9986; font-size: 11px; font-weight: 900; letter-spacing: .12em; }
 .ps2-placeholder h2 { margin: 18px 0 10px; font-size: 24px; }
@@ -174,7 +177,9 @@ button:focus-visible, input:focus-visible { outline: 2px solid #b9a9ff; outline-
   .player-title { padding-right: 48px; }
   .player-shell { margin: 10px; }
   .player-toolbar { align-items: stretch; flex-direction: column; padding: 12px; }
-  .toolbar-actions { display: grid; grid-template-columns: repeat(3, 1fr); }
+  .save-directory-status { max-width: calc(100vw - 24px); }
+  .toolbar-actions { display: grid; grid-template-columns: repeat(2, 1fr); }
+  .toolbar-select { grid-column: 1 / -1; }
 }
 
 @media (prefers-reduced-motion: reduce) {

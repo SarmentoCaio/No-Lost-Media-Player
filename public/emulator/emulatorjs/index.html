@@ -18,8 +18,12 @@
       (() => {
         "use strict";
 
-        const notify = (type, message) => {
-          window.parent.postMessage({ source: "no-lost-emulator", type, message }, window.location.origin);
+        const notify = (type, message, data = {}, transfer = []) => {
+          window.parent.postMessage(
+            { source: "no-lost-emulator", type, message, ...data },
+            window.location.origin,
+            transfer,
+          );
         };
 
         const fail = (message) => {
@@ -33,7 +37,7 @@
         };
 
         const params = new URLSearchParams(window.location.search);
-        const core = params.get("core");
+        let core = params.get("core");
         const rom = params.get("rom");
         const name = params.get("name") || "Jogo";
 
@@ -41,6 +45,46 @@
           fail("Os parâmetros do emulador estão incompletos.");
           return;
         }
+
+        // Mupen64Plus requer WebGL 2. ParaLLEl é a alternativa para GPUs/drivers
+        // que só oferecem WebGL 1 e que, de outra forma, exibiriam apenas uma tela preta.
+        if (core === "mupen64plus_next") {
+          const supportsWebGl2 = Boolean(document.createElement("canvas").getContext("webgl2"));
+          if (!supportsWebGl2) {
+            core = "parallel_n64";
+            notify("loading", "Usando o núcleo N64 de compatibilidade…");
+          }
+        }
+
+        window.addEventListener("message", (event) => {
+          if (event.source !== window.parent || event.origin !== window.location.origin) return;
+          const data = event.data;
+          if (data?.source !== "no-lost-player" || typeof data.requestId !== "string") return;
+
+          try {
+            const gameManager = window.EJS_emulator?.gameManager;
+            if (!gameManager) throw new Error("Aguarde o jogo terminar de iniciar.");
+
+            if (data.type === "export-state") {
+              if (!gameManager.supportsStates()) throw new Error("Este núcleo não oferece salvamento de estado.");
+              const state = gameManager.getState();
+              const stateBuffer = state instanceof Uint8Array
+                ? state.slice().buffer
+                : new Uint8Array(state).slice().buffer;
+              notify("state-exported", "Estado exportado", { requestId: data.requestId, state: stateBuffer }, [stateBuffer]);
+            } else if (data.type === "import-state") {
+              if (!(data.state instanceof ArrayBuffer)) throw new Error("O arquivo de salvamento é inválido.");
+              gameManager.loadState(new Uint8Array(data.state));
+              notify("state-imported", "Estado carregado", { requestId: data.requestId });
+            }
+          } catch (error) {
+            notify(
+              "state-error",
+              error instanceof Error ? error.message : "Falha ao acessar o salvamento.",
+              { requestId: data.requestId },
+            );
+          }
+        });
 
         window.addEventListener("error", (event) => {
           if (event.message) fail("O EmulatorJS encontrou um erro ao carregar o jogo.");
@@ -85,7 +129,8 @@
           window.EJS_core = core;
           window.EJS_gameUrl = rom;
           window.EJS_gameName = name;
-          window.EJS_pathtodata = "https://cdn.emulatorjs.org/stable/data/";
+          // Fixar a versão evita que uma atualização do CDN quebre os cores em produção.
+          window.EJS_pathtodata = "https://cdn.emulatorjs.org/4.2.3/data/";
           window.EJS_startOnLoaded = true;
           window.EJS_backgroundColor = "#050609";
           window.EJS_color = "#8b6cff";
@@ -95,7 +140,7 @@
           loader.src = `${window.EJS_pathtodata}loader.js`;
           loader.async = true;
           loader.onload = () => {
-            notify("ready", "EmulatorJS carregado");
+            notify("loading", "Runtime carregado. Iniciando o jogo…");
           };
           loader.onerror = () => {
             fail("Não foi possível baixar o EmulatorJS. Verifique sua conexão com a internet.");

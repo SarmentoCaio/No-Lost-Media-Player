@@ -8,8 +8,10 @@ export interface SaveRecord {
 }
 
 const DATABASE_NAME = "no-lost-media-player";
-const DATABASE_VERSION = 1;
+const DATABASE_VERSION = 2;
 const STORE_NAME = "saves";
+const SETTINGS_STORE_NAME = "settings";
+const SAVE_DIRECTORY_KEY = "save-directory";
 
 function openDatabase(): Promise<IDBDatabase> {
   return new Promise((resolve, reject) => {
@@ -19,6 +21,9 @@ function openDatabase(): Promise<IDBDatabase> {
       const database = request.result;
       if (!database.objectStoreNames.contains(STORE_NAME)) {
         database.createObjectStore(STORE_NAME, { keyPath: ["platform", "gameId"] });
+      }
+      if (!database.objectStoreNames.contains(SETTINGS_STORE_NAME)) {
+        database.createObjectStore(SETTINGS_STORE_NAME);
       }
     };
     request.onsuccess = () => resolve(request.result);
@@ -59,4 +64,24 @@ export async function deleteSave(platform: Platform, gameId: string): Promise<vo
   transaction.objectStore(STORE_NAME).delete([platform, gameId]);
   await transactionDone(transaction);
   database.close();
+}
+
+export async function putSaveDirectory(handle: FileSystemDirectoryHandle): Promise<void> {
+  const database = await openDatabase();
+  const transaction = database.transaction(SETTINGS_STORE_NAME, "readwrite");
+  transaction.objectStore(SETTINGS_STORE_NAME).put(handle, SAVE_DIRECTORY_KEY);
+  await transactionDone(transaction);
+  database.close();
+}
+
+export async function getSaveDirectory(): Promise<FileSystemDirectoryHandle | undefined> {
+  const database = await openDatabase();
+  const transaction = database.transaction(SETTINGS_STORE_NAME, "readonly");
+  const request = transaction.objectStore(SETTINGS_STORE_NAME).get(SAVE_DIRECTORY_KEY);
+  const result = await new Promise<FileSystemDirectoryHandle | undefined>((resolve, reject) => {
+    request.onsuccess = () => resolve(request.result as FileSystemDirectoryHandle | undefined);
+    request.onerror = () => reject(request.error ?? new Error("Falha ao ler a pasta de salvamentos."));
+  });
+  database.close();
+  return result;
 }

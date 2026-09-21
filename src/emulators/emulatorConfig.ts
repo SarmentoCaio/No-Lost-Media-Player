@@ -27,7 +27,9 @@ export const emulatorConfig: Record<Platform, EmulatorPlatformConfig> = {
     name: "PlayStation",
     shortName: "PS1",
     engine: "emulatorjs",
-    core: "mednafen_psx_hw",
+    // PCSX-ReARMed usa uma BIOS HLE quando o usuário não fornece uma BIOS real.
+    // O antigo mednafen_psx_hw interrompia a inicialização pedindo scph5500.bin.
+    core: "pcsx_rearmed",
     extensions: [".chd", ".bin", ".cue", ".pbp"],
     extensionLabel: ".chd, .bin/.cue ou .pbp",
     accent: "#67b8ff",

@@ -66,8 +66,8 @@ O projeto não inclui nem cria um proxy, não tenta contornar CORS e não baixa 
 GamePlayer
 ├── EmulatorJSPlayer (iframe isolado)
 │   ├── SNES: snes9x
-│   ├── N64: mupen64plus_next
-│   └── PS1: mednafen_psx_hw
+│   ├── N64: mupen64plus_next / parallel_n64
+│   └── PS1: pcsx_rearmed
 └── PS2Player
     └── Play! WebAssembly (futuro)
 ```
@@ -85,11 +85,15 @@ O contrato principal não conhece a hospedagem da ROM:
 <GamePlayer platform="snes" romUrl="URL_DA_ROM" />
 ```
 
-O player usa os identificadores atuais dos cores Libretro distribuídos pelo EmulatorJS. O loader e os dados são carregados de `https://cdn.emulatorjs.org/stable/data/`.
+O player usa os cores Libretro distribuídos pelo EmulatorJS 4.2.3. A versão do CDN é fixada para que uma atualização externa não altere o funcionamento do site sem uma nova publicação.
+
+O PS1 usa `pcsx_rearmed`, que possui BIOS HLE e não exige que o site distribua o arquivo protegido `scph5500.bin`. No N64, a barra do player permite alternar entre Mupen64Plus e ParaLLEl. O segundo é uma opção de compatibilidade para jogos, GPUs ou drivers que exibem tela preta no Mupen64Plus. Quando WebGL 2 não existe, a troca para ParaLLEl é automática.
 
 ## Salvamentos
 
-Nesta versão, os recursos de save/load expostos pelo próprio EmulatorJS podem ser usados dentro do iframe. Os botões externos ficam desabilitados até existir uma ponte de mensagens segura com o runtime. A abstração em `src/storage/saveStorage.ts` armazena futuramente `gameId`, `platform`, `saveData` e `updatedAt` no IndexedDB. ROMs não são persistidas.
+Os botões **Salvar** e **Carregar** usam uma ponte de mensagens com o iframe do EmulatorJS. Clique em **Pasta** para escolher onde os arquivos `.state` serão gravados. A pasta escolhida fica registrada como padrão no IndexedDB e o navegador solicita novamente a permissão quando necessário.
+
+A seleção direta de pasta usa a File System Access API, disponível no Chrome e Edge em HTTPS (e também em `localhost`). As ROMs continuam sem ser persistidas ou enviadas pelo player.
 
 ## Plano para PS2
 
