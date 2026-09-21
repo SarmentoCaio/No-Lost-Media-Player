@@ -40,6 +40,35 @@
         let core = params.get("core");
         const rom = params.get("rom");
         const name = params.get("name") || "Jogo";
+        let shuttingDown = false;
+        let pausedInBackground = false;
+
+        const shutdownEmulator = () => {
+          const emulator = window.EJS_emulator;
+          if (!emulator || shuttingDown) return;
+          shuttingDown = true;
+
+          // Silencia imediatamente e encerra o loop antes que o documento suma.
+          // pagehide também cobre fechamento de aba e navegação com bfcache.
+          try { emulator.setVolume?.(0); } catch (error) { console.warn(error); }
+          try { emulator.pause?.(true); } catch (error) { console.warn(error); }
+          try { emulator.gameManager?.toggleMainLoop?.(0); } catch (error) { console.warn(error); }
+          try { emulator.Module?.AL?.currentCtx?.audioCtx?.suspend?.(); } catch (error) { console.warn(error); }
+          try { emulator.callEvent?.("exit"); } catch (error) { console.warn(error); }
+        };
+
+        const syncPageVisibility = () => {
+          const emulator = window.EJS_emulator;
+          if (!emulator || shuttingDown) return;
+
+          if (document.hidden && !emulator.paused) {
+            emulator.pause?.(true);
+            pausedInBackground = true;
+          } else if (!document.hidden && pausedInBackground) {
+            emulator.play?.(true);
+            pausedInBackground = false;
+          }
+        };
 
         if (!core || !rom) {
           fail("Os parâmetros do emulador estão incompletos.");
@@ -59,7 +88,14 @@
         window.addEventListener("message", (event) => {
           if (event.source !== window.parent || event.origin !== window.location.origin) return;
           const data = event.data;
-          if (data?.source !== "no-lost-player" || typeof data.requestId !== "string") return;
+          if (data?.source !== "no-lost-player") return;
+
+          if (data.type === "shutdown") {
+            shutdownEmulator();
+            return;
+          }
+
+          if (typeof data.requestId !== "string") return;
 
           try {
             const gameManager = window.EJS_emulator?.gameManager;
@@ -85,6 +121,9 @@
             );
           }
         });
+
+        window.addEventListener("pagehide", shutdownEmulator);
+        document.addEventListener("visibilitychange", syncPageVisibility);
 
         window.addEventListener("error", (event) => {
           if (event.message) fail("O EmulatorJS encontrou um erro ao carregar o jogo.");
@@ -145,7 +184,10 @@
           window.EJS_startOnLoaded = true;
           window.EJS_backgroundColor = "#050609";
           window.EJS_color = "#8b6cff";
-          window.EJS_onGameStart = () => notify("ready", "Jogo iniciado");
+          window.EJS_onGameStart = () => {
+            notify("ready", "Jogo iniciado");
+            syncPageVisibility();
+          };
 
           const loader = document.createElement("script");
           loader.src = `${window.EJS_pathtodata}loader.js`;

@@ -60,7 +60,11 @@ export default function App() {
       URL.revokeObjectURL(localObjectUrl.current);
       localObjectUrl.current = null;
     }
-    window.history.pushState({}, "", "/");
+    if (window.history.length > 1) {
+      window.history.back();
+      return;
+    }
+    window.history.replaceState({}, "", "/");
     setLaunch(null);
   };
 

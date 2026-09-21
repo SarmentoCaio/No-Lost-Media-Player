@@ -116,9 +116,19 @@ export const EmulatorJSPlayer = forwardRef<EmulatorJSPlayerHandle, EmulatorJSPla
       }
     };
 
+    const shutdownEmulator = () => {
+      iframeRef.current?.contentWindow?.postMessage(
+        { source: "no-lost-player", type: "shutdown" },
+        window.location.origin,
+      );
+    };
+
     window.addEventListener("message", handleMessage);
+    window.addEventListener("pagehide", shutdownEmulator);
     return () => {
+      shutdownEmulator();
       window.removeEventListener("message", handleMessage);
+      window.removeEventListener("pagehide", shutdownEmulator);
       onReady?.(false);
       for (const pending of pendingRequests.current.values()) {
         window.clearTimeout(pending.timeout);

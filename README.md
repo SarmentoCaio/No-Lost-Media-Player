@@ -95,6 +95,8 @@ Os botões **Salvar** e **Carregar** usam uma ponte de mensagens com o iframe do
 
 A seleção direta de pasta usa a File System Access API, disponível no Chrome e Edge em HTTPS (e também em `localhost`). As ROMs continuam sem ser persistidas ou enviadas pelo player.
 
+O emulador pausa automaticamente quando sua aba fica em segundo plano. Ao voltar, fechar ou navegar para fora do player, a página envia um comando explícito de encerramento ao runtime, interrompe o áudio e finaliza o loop de emulação.
+
 ## Plano para PS2
 
 `PS2Player` está separado dos adaptadores EmulatorJS. Quando a distribuição web oficial do Play! for adotada, `Play.js`, `Play.wasm` e o worker poderão ser instalados em `public/emulator/ps2/`, com uma ponte própria de inicialização e erros. Esta versão não improvisa um emulador, não inclui BIOS e mostra “Suporte PS2 em desenvolvimento”.
