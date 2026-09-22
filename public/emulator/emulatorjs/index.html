@@ -236,11 +236,18 @@
               { urls: "turn:openrelay.metered.ca:443", username: "openrelayproject", credential: "openrelayproject" },
             ];
           }
+          const defaultOptions = {};
+          // O build pre nao publica os relatorios dos cores N64; sem esta
+          // preferencia eles caem no build WebGL 1 legado e podem abortar.
+          if (core === "mupen64plus_next" || core === "parallel_n64") {
+            defaultOptions.webgl2Enabled = "enabled";
+          }
           if (core === "pcsx_rearmed") {
             // Sem uma BIOS oficial fornecida pelo usuário, força a BIOS HLE do core.
             // O modo Auto de builds antigos pode selecionar uma região incorreta.
-            window.EJS_defaultOptions = { pcsx_rearmed_bios: "HLE" };
+            defaultOptions.pcsx_rearmed_bios = "HLE";
           }
+          window.EJS_defaultOptions = defaultOptions;
           window.EJS_startOnLoaded = true;
           window.EJS_backgroundColor = "#050609";
           window.EJS_color = "#8b6cff";
