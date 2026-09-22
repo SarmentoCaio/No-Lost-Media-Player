@@ -84,7 +84,7 @@ GamePlayer
 O contrato principal não conhece a hospedagem da ROM:
 
 ```tsx
-<GamePlayer platform="snes" romUrl="URL_DA_ROM" />
+<GamePlayer platform="snes" gameId="id-do-jogo" romUrl="URL_DA_ROM" />
 ```
 
 O player usa os cores Libretro distribuídos pelo EmulatorJS. NES, SNES, GBA, N64 e PS1 usam o build 4.3.0-pre, necessário para as salas online e que também contém uma versão mais recente do PCSX-ReARMed com correções para jogos japoneses. A versão do CDN é fixada para que uma atualização externa não altere o funcionamento do site sem uma nova publicação.
@@ -121,9 +121,9 @@ O player usa esse endereço por padrão. Para usar outro servidor, defina `VITE_
 
 O catálogo também possui Dreamcast, GameCube, Wii, PS2 e PS3. Eles não foram ativados nesta etapa porque não existem cores compatíveis no runtime usado ou exigem runtimes WebAssembly próprios, BIOS, isolamento por cabeçalhos e arquivos de vários gigabytes. `PS2Player` permanece separado para uma futura integração oficial do Play!; Dreamcast e os consoles baseados em Dolphin/RPCS3 também devem receber adaptadores próprios em vez de uma implementação improvisada.
 
-## Integração futura com No Lost Media
+## Integração com No Lost Media
 
-O catálogo poderá montar o mesmo contrato com um objeto `Game`:
+O catálogo monta o contrato de lançamento a partir de um objeto `Game`:
 
 ```ts
 {
