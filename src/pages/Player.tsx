@@ -1,9 +1,10 @@
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useRef, useState, type CSSProperties } from "react";
 import { emulatorConfig } from "../emulators/emulatorConfig";
 import type { PlayerLaunch } from "../types/game";
 import { GamePlayer } from "../components/GamePlayer";
 import { PlayerToolbar } from "../components/PlayerToolbar";
 import type { EmulatorJSPlayerHandle } from "../components/EmulatorJSPlayer";
+import { PlatformIcon } from "../components/PlatformIcon";
 
 interface PlayerProps {
   launch: PlayerLaunch;
@@ -15,20 +16,42 @@ export function Player({ launch, onBack }: PlayerProps) {
   const emulatorRef = useRef<EmulatorJSPlayerHandle>(null);
   const [error, setError] = useState<string | null>(null);
   const [playerReady, setPlayerReady] = useState(false);
+  const [playerInstance, setPlayerInstance] = useState(0);
   const [n64Core, setN64Core] = useState(emulatorConfig.n64.core);
   const handleError = useCallback((message: string) => setError(message), []);
+  const config = emulatorConfig[launch.platform];
+
+  const restartPlayer = () => {
+    setError(null);
+    setPlayerReady(false);
+    setPlayerInstance((current) => current + 1);
+  };
+
+  const themeStyle = {
+    "--console-accent": config.accent,
+    "--console-accent-secondary": config.accentSecondary,
+  } as CSSProperties;
 
   return (
-    <main className="player-page">
+    <main className={`player-page player-theme--${launch.platform}`} style={themeStyle}>
       <header className="player-header">
         <button className="back-button" type="button" onClick={onBack}>
           <span aria-hidden="true">←</span> Voltar
         </button>
-        <div className="player-title">
-          <span>{emulatorConfig[launch.platform].shortName}</span>
-          <h1>{launch.title}</h1>
+        <div className="player-console-identity">
+          <span className="player-console-mark" aria-hidden="true">
+            <PlatformIcon platform={launch.platform} />
+          </span>
+          <div className="player-title">
+            <span>{config.manufacturer} · {config.shortName}</span>
+            <h1>{launch.title}</h1>
+            <small>{config.name} · {config.era}</small>
+          </div>
         </div>
-        <span className="header-spacer" aria-hidden="true" />
+        <div className={`player-runtime-status${playerReady ? " player-runtime-status--ready" : ""}`}>
+          <span aria-hidden="true" />
+          {playerReady ? "Emulação ativa" : "Inicializando"}
+        </div>
       </header>
 
       {error && (
@@ -42,7 +65,12 @@ export function Player({ launch, onBack }: PlayerProps) {
       )}
 
       <div className="player-shell" ref={playerContainer}>
+        <div className="player-shell-brand" aria-hidden="true">
+          <span>{config.shortName}</span>
+          <i /><i />
+        </div>
         <GamePlayer
+          key={`${launch.gameId}-${n64Core}-${playerInstance}`}
           platform={launch.platform}
           romUrl={launch.romUrl}
           gameId={launch.gameId}
@@ -66,6 +94,7 @@ export function Player({ launch, onBack }: PlayerProps) {
           setPlayerReady(false);
           setN64Core(core);
         } : undefined}
+        onRestart={restartPlayer}
         onError={handleError}
       />
     </main>

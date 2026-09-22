@@ -24,6 +24,7 @@ export interface EmulatorJSPlayerHandle {
   exportState: () => Promise<ArrayBuffer>;
   importState: (state: ArrayBuffer) => Promise<void>;
   openNetplay: () => Promise<void>;
+  openControls: () => Promise<void>;
 }
 
 interface PendingRequest {
@@ -64,7 +65,10 @@ export const EmulatorJSPlayer = forwardRef<EmulatorJSPlayerHandle, EmulatorJSPla
     return `/emulator/emulatorjs/index.html?${parameters.toString()}`;
   }, [core, gameName, netplayServer, numericGameId, platform, romUrl]);
 
-  const sendCommand = (type: "export-state" | "import-state" | "open-netplay", state?: ArrayBuffer) => {
+  const sendCommand = (
+    type: "export-state" | "import-state" | "open-netplay" | "open-controls",
+    state?: ArrayBuffer,
+  ) => {
     return new Promise<ArrayBuffer | void>((resolve, reject) => {
       const target = iframeRef.current?.contentWindow;
       if (!target) {
@@ -97,6 +101,9 @@ export const EmulatorJSPlayer = forwardRef<EmulatorJSPlayerHandle, EmulatorJSPla
     openNetplay: async () => {
       await sendCommand("open-netplay");
     },
+    openControls: async () => {
+      await sendCommand("open-controls");
+    },
   }), [emulatorUrl]);
 
   useEffect(() => {
@@ -121,6 +128,7 @@ export const EmulatorJSPlayer = forwardRef<EmulatorJSPlayerHandle, EmulatorJSPla
         data.type === "state-exported"
         || data.type === "state-imported"
         || data.type === "netplay-opened"
+        || data.type === "controls-opened"
         || data.type === "command-error"
       ) {
         if (typeof data.requestId !== "string") return;

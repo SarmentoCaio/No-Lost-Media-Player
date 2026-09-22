@@ -1,4 +1,4 @@
-export type Platform = "snes" | "n64" | "ps1" | "ps2";
+export type Platform = "nes" | "snes" | "gba" | "n64" | "ps1" | "ps2";
 
 export interface Game {
   id: string;

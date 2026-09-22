@@ -85,3 +85,31 @@ export async function getSaveDirectory(): Promise<FileSystemDirectoryHandle | un
   database.close();
   return result;
 }
+
+export async function clearSaveDirectory(): Promise<void> {
+  const database = await openDatabase();
+  const transaction = database.transaction(SETTINGS_STORE_NAME, "readwrite");
+  transaction.objectStore(SETTINGS_STORE_NAME).delete(SAVE_DIRECTORY_KEY);
+  await transactionDone(transaction);
+  database.close();
+}
+
+/**
+ * Retorna a pasta privada padrão do site (OPFS). No Chrome/Edge ela fica
+ * fisicamente dentro do perfil do navegador, normalmente sob AppData, mas
+ * sem expor um caminho do sistema operacional nem pedir permissão ao usuário.
+ */
+export async function getBrowserSaveDirectory(): Promise<FileSystemDirectoryHandle | undefined> {
+  const storage = navigator.storage as StorageManager & {
+    getDirectory?: () => Promise<FileSystemDirectoryHandle>;
+  };
+  if (!storage.getDirectory) return undefined;
+  const root = await storage.getDirectory();
+  const appDirectory = await root.getDirectoryHandle("No Lost Media Player", { create: true });
+  return appDirectory.getDirectoryHandle("Saves", { create: true });
+}
+
+export async function requestPersistentStorage(): Promise<boolean> {
+  if (!navigator.storage?.persist) return false;
+  return navigator.storage.persist();
+}

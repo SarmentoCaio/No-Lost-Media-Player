@@ -12,6 +12,18 @@ const commonProps = {
 } as const;
 
 export function PlatformIcon({ platform }: PlatformIconProps) {
+  if (platform === "nes") {
+    return (
+      <svg {...commonProps}>
+        <path d="M12 19h96v43H12z" />
+        <path d="M19 25h54v23H19zM78 25h23v30H78z" className="platform-icon__soft" />
+        <path d="M26 54h43M83 32h12M83 39h12" />
+        <circle cx="86" cy="49" r="3" className="platform-icon__accent-fill" />
+        <circle cx="95" cy="49" r="3" className="platform-icon__accent-fill" />
+      </svg>
+    );
+  }
+
   if (platform === "snes") {
     return (
       <svg {...commonProps}>
@@ -35,6 +47,19 @@ export function PlatformIcon({ platform }: PlatformIconProps) {
         <circle cx="88" cy="30" r="3.5" className="platform-icon__accent-fill" />
         <circle cx="97" cy="38" r="3.5" className="platform-icon__accent-fill" />
         <circle cx="60" cy="42" r="6" />
+      </svg>
+    );
+  }
+
+  if (platform === "gba") {
+    return (
+      <svg {...commonProps}>
+        <path d="M16 19c13-5 75-5 88 0l8 34c1 7-5 12-11 8L86 50H34L19 61c-6 4-12-1-11-8l8-34Z" />
+        <path d="M43 23h34v22H43z" className="platform-icon__soft" />
+        <path d="M25 31v14M18 38h14" />
+        <circle cx="91" cy="34" r="4" className="platform-icon__accent-fill" />
+        <circle cx="101" cy="42" r="4" />
+        <path d="M48 55h24" />
       </svg>
     );
   }

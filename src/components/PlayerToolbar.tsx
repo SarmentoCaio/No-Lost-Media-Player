@@ -1,7 +1,15 @@
 import { useEffect, useState, type RefObject } from "react";
 import type { EmulatorJSPlayerHandle } from "./EmulatorJSPlayer";
 import { useGamepad } from "../hooks/useGamepad";
-import { getSaveDirectory, putSaveDirectory } from "../storage/saveStorage";
+import {
+  clearSaveDirectory,
+  getBrowserSaveDirectory,
+  getSave,
+  getSaveDirectory,
+  putSave,
+  putSaveDirectory,
+  requestPersistentStorage,
+} from "../storage/saveStorage";
 import type { Platform } from "../types/game";
 
 interface DirectoryHandleWithPermission extends FileSystemDirectoryHandle {
@@ -27,6 +35,7 @@ interface PlayerToolbarProps {
   playerReady: boolean;
   n64Core?: string;
   onN64CoreChange?: (core: string) => void;
+  onRestart: () => void;
   onError: (message: string) => void;
 }
 
@@ -43,6 +52,7 @@ export function PlayerToolbar({
   playerReady,
   n64Core,
   onN64CoreChange,
+  onRestart,
   onError,
 }: PlayerToolbarProps) {
   const gamepad = useGamepad();
@@ -78,7 +88,7 @@ export function PlayerToolbar({
   };
 
   const ensureWritableDirectory = async () => {
-    if (!directory) return selectDirectory();
+    if (!directory) return null;
     const descriptor = { mode: "readwrite" as const };
     const currentPermission = directory.queryPermission
       ? await directory.queryPermission(descriptor)
@@ -95,18 +105,47 @@ export function PlayerToolbar({
 
   const stateFileName = `${platform}-${gameId}.state`;
 
+  const saveToBrowserStorage = async (state: ArrayBuffer) => {
+    const browserDirectory = await getBrowserSaveDirectory();
+    if (browserDirectory) {
+      const fileHandle = await browserDirectory.getFileHandle(stateFileName, { create: true });
+      const writable = await fileHandle.createWritable();
+      await writable.write(state);
+      await writable.close();
+      await requestPersistentStorage().catch(() => false);
+      return;
+    }
+    await putSave({ gameId, platform, saveData: state, updatedAt: new Date().toISOString() });
+  };
+
+  const loadFromBrowserStorage = async () => {
+    const browserDirectory = await getBrowserSaveDirectory();
+    if (browserDirectory) {
+      const fileHandle = await browserDirectory.getFileHandle(stateFileName);
+      return (await fileHandle.getFile()).arrayBuffer();
+    }
+    const record = await getSave(platform, gameId);
+    if (!record) throw new DOMException("Save não encontrado", "NotFoundError");
+    return record.saveData;
+  };
+
   const saveGame = async () => {
     if (!emulatorRef.current) return;
     setBusy(true);
     setSaveMessage(null);
     try {
-      const targetDirectory = await ensureWritableDirectory();
       const state = await emulatorRef.current.exportState();
-      const fileHandle = await targetDirectory.getFileHandle(stateFileName, { create: true });
-      const writable = await fileHandle.createWritable();
-      await writable.write(state);
-      await writable.close();
-      setSaveMessage(`Salvo em ${targetDirectory.name}\\${stateFileName}`);
+      const targetDirectory = await ensureWritableDirectory();
+      if (targetDirectory) {
+        const fileHandle = await targetDirectory.getFileHandle(stateFileName, { create: true });
+        const writable = await fileHandle.createWritable();
+        await writable.write(state);
+        await writable.close();
+        setSaveMessage(`Salvo em ${targetDirectory.name}\\${stateFileName}`);
+      } else {
+        await saveToBrowserStorage(state);
+        setSaveMessage(`Salvo automaticamente em No Lost Media Player/Saves`);
+      }
     } catch (error) {
       if (error instanceof DOMException && error.name === "AbortError") return;
       onError(error instanceof Error ? error.message : "Não foi possível salvar o jogo.");
@@ -121,14 +160,19 @@ export function PlayerToolbar({
     setSaveMessage(null);
     try {
       const targetDirectory = await ensureWritableDirectory();
-      const fileHandle = await targetDirectory.getFileHandle(stateFileName);
-      const file = await fileHandle.getFile();
-      await emulatorRef.current.importState(await file.arrayBuffer());
-      setSaveMessage(`Carregado de ${targetDirectory.name}\\${stateFileName}`);
+      if (targetDirectory) {
+        const fileHandle = await targetDirectory.getFileHandle(stateFileName);
+        const file = await fileHandle.getFile();
+        await emulatorRef.current.importState(await file.arrayBuffer());
+        setSaveMessage(`Carregado de ${targetDirectory.name}\\${stateFileName}`);
+      } else {
+        await emulatorRef.current.importState(await loadFromBrowserStorage());
+        setSaveMessage(`Carregado de No Lost Media Player/Saves`);
+      }
     } catch (error) {
       if (error instanceof DOMException && error.name === "AbortError") return;
       if (error instanceof DOMException && error.name === "NotFoundError") {
-        onError(`Ainda não existe um salvamento para este jogo em ${directory?.name ?? "essa pasta"}.`);
+        onError(`Ainda não existe um salvamento para este jogo em ${directory?.name ?? "No Lost Media Player/Saves"}.`);
       } else {
         onError(error instanceof Error ? error.message : "Não foi possível carregar o jogo.");
       }
@@ -149,12 +193,31 @@ export function PlayerToolbar({
     }
   };
 
+  const openControls = async () => {
+    if (!emulatorRef.current) return;
+    try {
+      await emulatorRef.current.openControls();
+    } catch (error) {
+      onError(error instanceof Error ? error.message : "Não foi possível abrir o mapeamento de controles.");
+    }
+  };
+
   const chooseDirectory = async () => {
     try {
       await selectDirectory();
     } catch (error) {
       if (error instanceof DOMException && error.name === "AbortError") return;
       onError(error instanceof Error ? error.message : "Não foi possível selecionar a pasta.");
+    }
+  };
+
+  const useBrowserDirectory = async () => {
+    try {
+      await clearSaveDirectory();
+      setDirectory(null);
+      setSaveMessage("Pasta padrão restaurada: armazenamento local do navegador");
+    } catch (error) {
+      onError(error instanceof Error ? error.message : "Não foi possível restaurar a pasta padrão.");
     }
   };
 
@@ -176,7 +239,9 @@ export function PlayerToolbar({
           <span>{gamepad ? `${gamepad.id} conectado` : "Nenhum controle conectado"}</span>
         </div>
         <span className="save-directory-status" title={saveMessage ?? undefined}>
-          {saveMessage ?? (directory ? `Pasta padrão: ${directory.name}` : "Escolha uma pasta para os saves")}
+          {saveMessage ?? (directory
+            ? `Saves em: ${directory.name}`
+            : "Saves automáticos: No Lost Media Player/Saves (armazenamento do navegador)")}
         </span>
       </div>
       <div className="toolbar-actions">
@@ -199,14 +264,37 @@ export function PlayerToolbar({
         >
           Jogar online
         </button>
-        <button type="button" className="toolbar-button" onClick={chooseDirectory} disabled={busy}>
-          Pasta
+        <button
+          type="button"
+          className="toolbar-button"
+          onClick={openControls}
+          disabled={!playerReady || busy}
+          title="Configure as teclas e os controles de cada jogador"
+        >
+          Controles
         </button>
+        <button type="button" className="toolbar-button" onClick={chooseDirectory} disabled={busy}>
+          Pasta de saves
+        </button>
+        {directory && (
+          <button type="button" className="toolbar-button toolbar-button--quiet" onClick={useBrowserDirectory} disabled={busy}>
+            Usar padrão
+          </button>
+        )}
         <button type="button" className="toolbar-button" onClick={saveGame} disabled={!playerReady || busy}>
           Salvar
         </button>
         <button type="button" className="toolbar-button" onClick={loadGame} disabled={!playerReady || busy}>
           Carregar
+        </button>
+        <button
+          type="button"
+          className="toolbar-button toolbar-button--restart"
+          onClick={onRestart}
+          disabled={busy}
+          title="Encerra e inicia novamente a emulação deste jogo"
+        >
+          Reiniciar
         </button>
         <button type="button" className="toolbar-button toolbar-button--primary" onClick={enterFullscreen}>
           <span aria-hidden="true">⛶</span> Tela cheia

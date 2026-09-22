@@ -2,6 +2,19 @@ import type { EmulatorPlatformConfig } from "./emulatorTypes";
 import type { Platform } from "../types/game";
 
 export const emulatorConfig: Record<Platform, EmulatorPlatformConfig> = {
+  nes: {
+    id: "nes",
+    name: "Nintendo Entertainment System",
+    shortName: "NES",
+    engine: "emulatorjs",
+    core: "fceumm",
+    extensions: [".nes", ".zip"],
+    extensionLabel: ".nes ou .zip",
+    accent: "#ef4444",
+    accentSecondary: "#f5f5f4",
+    manufacturer: "Nintendo",
+    era: "8-bit · 1983",
+  },
   snes: {
     id: "snes",
     name: "Super Nintendo",
@@ -11,6 +24,22 @@ export const emulatorConfig: Record<Platform, EmulatorPlatformConfig> = {
     extensions: [".sfc", ".smc", ".zip"],
     extensionLabel: ".sfc, .smc ou .zip",
     accent: "#a98cff",
+    accentSecondary: "#ef5d8f",
+    manufacturer: "Nintendo",
+    era: "16-bit · 1990",
+  },
+  gba: {
+    id: "gba",
+    name: "Game Boy Advance",
+    shortName: "GBA",
+    engine: "emulatorjs",
+    core: "mgba",
+    extensions: [".gba", ".zip"],
+    extensionLabel: ".gba ou .zip",
+    accent: "#8b7cff",
+    accentSecondary: "#d8b4fe",
+    manufacturer: "Nintendo",
+    era: "Portátil 32-bit · 2001",
   },
   n64: {
     id: "n64",
@@ -21,6 +50,9 @@ export const emulatorConfig: Record<Platform, EmulatorPlatformConfig> = {
     extensions: [".z64", ".n64", ".v64", ".zip"],
     extensionLabel: ".z64, .n64, .v64 ou .zip",
     accent: "#5bd69b",
+    accentSecondary: "#ffd84d",
+    manufacturer: "Nintendo",
+    era: "64-bit · 1996",
   },
   ps1: {
     id: "ps1",
@@ -33,6 +65,9 @@ export const emulatorConfig: Record<Platform, EmulatorPlatformConfig> = {
     extensions: [".chd", ".bin", ".cue", ".pbp"],
     extensionLabel: ".chd, .bin/.cue ou .pbp",
     accent: "#67b8ff",
+    accentSecondary: "#f15b6c",
+    manufacturer: "Sony Computer Entertainment",
+    era: "32-bit · 1994",
   },
   ps2: {
     id: "ps2",
@@ -43,6 +78,9 @@ export const emulatorConfig: Record<Platform, EmulatorPlatformConfig> = {
     extensions: [".iso", ".chd", ".cso"],
     extensionLabel: ".iso, .chd ou .cso",
     accent: "#ff8b72",
+    accentSecondary: "#4ea8ff",
+    manufacturer: "Sony Computer Entertainment",
+    era: "128-bit · 2000",
   },
 };
 

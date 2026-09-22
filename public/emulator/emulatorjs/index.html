@@ -80,6 +80,19 @@
           }
         };
 
+        // O EmulatorJS escuta teclado apenas no contêiner do player. Quando o
+        // popup de remapeamento move o foco para o documento, a tecla não chega
+        // ao listener original. A captura no documento encaminha somente a
+        // tecla que está sendo configurada e não interfere durante o jogo.
+        const captureKeyboardRemap = (event) => {
+          const emulator = window.EJS_emulator;
+          const popup = emulator?.controlPopup?.parentElement?.parentElement;
+          if (!popup || popup.hasAttribute("hidden") || event.isComposing) return;
+          event.preventDefault();
+          event.stopImmediatePropagation();
+          emulator.keyChange?.(event);
+        };
+
         if (!core || !rom) {
           fail("Os parâmetros do emulador estão incompletos.");
           return;
@@ -112,7 +125,13 @@
             const gameManager = emulator?.gameManager;
             if (!gameManager) throw new Error("Aguarde o jogo terminar de iniciar.");
 
-            if (data.type === "open-netplay") {
+            if (data.type === "open-controls") {
+              if (!emulator.controlMenu) throw new Error("O menu de controles ainda não está disponível.");
+              emulator.controlMenu.style.display = "";
+              emulator.elements?.parent?.setAttribute?.("tabindex", "-1");
+              emulator.elements?.parent?.focus?.({ preventScroll: true });
+              notify("controls-opened", "Configuração de controles aberta", { requestId: data.requestId });
+            } else if (data.type === "open-netplay") {
               if (!netplayServer || !Number.isSafeInteger(gameId) || gameId <= 0) {
                 throw new Error("O servidor de salas online não está configurado.");
               }
@@ -154,6 +173,7 @@
 
         window.addEventListener("pagehide", shutdownEmulator);
         document.addEventListener("visibilitychange", syncPageVisibility);
+        document.addEventListener("keydown", captureKeyboardRemap, true);
 
         window.addEventListener("error", (event) => {
           if (event.message) fail("O EmulatorJS encontrou um erro ao carregar o jogo.");
@@ -202,12 +222,12 @@
           window.EJS_core = core;
           window.EJS_gameUrl = rom;
           window.EJS_gameName = name;
+          if (Number.isSafeInteger(gameId) && gameId > 0) window.EJS_gameID = gameId;
           // O netplay está disponível a partir do 4.3.0-pre. Essa versão também
           // contém a correção do PCSX-ReARMed usada pelos jogos japoneses.
           const emulatorVersion = "4.3.0-pre";
           window.EJS_pathtodata = `https://cdn.emulatorjs.org/${emulatorVersion}/data/`;
           if (netplayServer && Number.isSafeInteger(gameId) && gameId > 0) {
-            window.EJS_gameID = gameId;
             window.EJS_netplayServer = netplayServer;
             window.EJS_netplayICEServers = [
               { urls: "stun:stun.l.google.com:19302" },

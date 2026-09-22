@@ -11,4 +11,7 @@ export interface EmulatorPlatformConfig {
   extensions: readonly string[];
   extensionLabel: string;
   accent: string;
+  accentSecondary: string;
+  manufacturer: string;
+  era: string;
 }
