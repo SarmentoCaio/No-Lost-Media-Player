@@ -3,6 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="preconnect" href="https://cdn.emulatorjs.org" crossorigin />
     <title>EmulatorJS</title>
     <style>
       html, body, #game { width: 100%; height: 100%; margin: 0; overflow: hidden; background: #050609; }
@@ -98,6 +99,19 @@
           return;
         }
 
+        if (/^https?:/i.test(rom)) {
+          try {
+            const romConnection = document.createElement("link");
+            romConnection.rel = "preconnect";
+            romConnection.href = new URL(rom).origin;
+            romConnection.crossOrigin = "anonymous";
+            document.head.appendChild(romConnection);
+          } catch {
+            fail("A URL da ROM não é válida.");
+            return;
+          }
+        }
+
         // Mupen64Plus requer WebGL 2. ParaLLEl é a alternativa para GPUs/drivers
         // que só oferecem WebGL 1 e que, de outra forma, exibiriam apenas uma tela preta.
         if (core === "mupen64plus_next") {
@@ -186,37 +200,7 @@
           fail(`A ROM não pôde ser carregada. Detalhe: ${detail}`);
         });
 
-        const verifyRemoteRom = async () => {
-          if (!/^https?:/i.test(rom)) return;
-          notify("loading", "Verificando acesso à ROM…");
-          const controller = new AbortController();
-          try {
-            const response = await fetch(rom, {
-              method: "GET",
-              headers: { Range: "bytes=0-0" },
-              signal: controller.signal,
-            });
-            if (!response.ok) {
-              throw new Error(`HTTP ${response.status}`);
-            }
-          } catch (error) {
-            if (error instanceof Error && /^HTTP /.test(error.message)) {
-              throw new Error(`A URL da ROM respondeu com erro ${error.message.replace("HTTP ", "")}.`);
-            }
-            throw new Error("O servidor da ROM não permite carregamento por outro domínio.");
-          } finally {
-            controller.abort();
-          }
-        };
-
-        const start = async () => {
-          try {
-            await verifyRemoteRom();
-          } catch (error) {
-            fail(error instanceof Error ? error.message : "Não foi possível acessar a URL da ROM.");
-            return;
-          }
-
+        const start = () => {
           notify("loading", "Carregando EmulatorJS…");
           window.EJS_player = "#game";
           window.EJS_core = core;
@@ -227,6 +211,14 @@
           // contém a correção do PCSX-ReARMed usada pelos jogos japoneses.
           const emulatorVersion = "4.3.0-pre";
           window.EJS_pathtodata = `https://cdn.emulatorjs.org/${emulatorVersion}/data/`;
+          window.EJS_cacheConfig = {
+            enabled: true,
+            cacheMaxSizeMB: 4096,
+            cacheMaxAgeMins: 43200,
+          };
+          // O core com threads reduz o tempo de inicialização e melhora a
+          // estabilidade do PS1 depois que a imagem do disco é descompactada.
+          window.EJS_threads = core === "pcsx_rearmed" && window.crossOriginIsolated;
           if (netplayServer && Number.isSafeInteger(gameId) && gameId > 0) {
             window.EJS_netplayServer = netplayServer;
             window.EJS_netplayICEServers = [
@@ -239,7 +231,7 @@
           const defaultOptions = {};
           // O build pre nao publica os relatorios dos cores N64; sem esta
           // preferencia eles caem no build WebGL 1 legado e podem abortar.
-          if (core === "mupen64plus_next" || core === "parallel_n64") {
+          if (core === "mupen64plus_next" || core === "parallel_n64" || core === "pcsx_rearmed") {
             defaultOptions.webgl2Enabled = "enabled";
           }
           if (core === "pcsx_rearmed") {
