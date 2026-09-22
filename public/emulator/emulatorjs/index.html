@@ -196,6 +196,16 @@
           const detail = event.reason instanceof Error
             ? event.reason.message
             : typeof event.reason === "string" ? event.reason : "erro interno sem detalhes";
+
+          // O EmulatorJS solicita um Wake Lock durante a inicialização. Chrome
+          // rejeita a solicitação quando o jogo é aberto em uma aba de fundo,
+          // mas isso não impede a ROM ou o core de continuarem carregando.
+          if (/wake\s?lock/i.test(detail) && /(not visible|not active|visibility)/i.test(detail)) {
+            event.preventDefault();
+            console.warn("Wake Lock indisponível enquanto a aba está em segundo plano.");
+            return;
+          }
+
           console.error("Falha não tratada no EmulatorJS:", event.reason);
           fail(`A ROM não pôde ser carregada. Detalhe: ${detail}`);
         });
