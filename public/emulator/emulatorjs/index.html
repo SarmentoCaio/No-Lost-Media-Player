@@ -132,6 +132,16 @@
             return;
           }
 
+          if (data.type === "pause") {
+            window.EJS_emulator?.pause?.(true);
+            return;
+          }
+
+          if (data.type === "resume") {
+            window.EJS_emulator?.play?.(true);
+            return;
+          }
+
           if (typeof data.requestId !== "string") return;
 
           try {

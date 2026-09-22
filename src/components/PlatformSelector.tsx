@@ -1,4 +1,4 @@
-import { platforms } from "../emulators/emulatorConfig";
+import { availablePlatforms } from "../emulators/emulatorConfig";
 import type { Platform } from "../types/game";
 import { PlatformIcon } from "./PlatformIcon";
 
@@ -10,7 +10,7 @@ interface PlatformSelectorProps {
 export function PlatformSelector({ selected, onSelect }: PlatformSelectorProps) {
   return (
     <div className="platform-grid" role="radiogroup" aria-label="Plataforma">
-      {platforms.map((platform) => (
+      {availablePlatforms.map((platform) => (
         <button
           className={`platform-card${selected === platform.id ? " platform-card--selected" : ""}`}
           key={platform.id}

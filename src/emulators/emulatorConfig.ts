@@ -75,8 +75,8 @@ export const emulatorConfig: Record<Platform, EmulatorPlatformConfig> = {
     shortName: "PS2",
     engine: "play",
     core: "play",
-    extensions: [".iso", ".chd", ".cso"],
-    extensionLabel: ".iso, .chd ou .cso",
+    extensions: [".iso", ".bin", ".chd", ".cso"],
+    extensionLabel: ".iso, .bin, .chd ou .cso",
     accent: "#ff8b72",
     accentSecondary: "#4ea8ff",
     manufacturer: "Sony Computer Entertainment",
@@ -85,6 +85,9 @@ export const emulatorConfig: Record<Platform, EmulatorPlatformConfig> = {
 };
 
 export const platforms = Object.values(emulatorConfig);
+export const availablePlatforms = platforms.filter(
+  (platform) => platform.id !== "ps2" || import.meta.env.VITE_PS2_ENABLED === "true",
+);
 
 export function isPlatform(value: string): value is Platform {
   return value in emulatorConfig;

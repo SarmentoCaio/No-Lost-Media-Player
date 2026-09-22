@@ -3,7 +3,11 @@ import { emulatorConfig } from "../emulators/emulatorConfig";
 import type { PlayerLaunch } from "../types/game";
 import { GamePlayer } from "../components/GamePlayer";
 import { PlayerToolbar } from "../components/PlayerToolbar";
-import type { EmulatorJSPlayerHandle } from "../components/EmulatorJSPlayer";
+import {
+  EMULATOR_JS_CAPABILITIES,
+  PLAY_PS2_CAPABILITIES,
+  type PlayerAdapter,
+} from "../emulators/PlayerAdapter";
 import { PlatformIcon } from "../components/PlatformIcon";
 
 interface PlayerProps {
@@ -13,7 +17,7 @@ interface PlayerProps {
 
 export function Player({ launch, onBack }: PlayerProps) {
   const playerContainer = useRef<HTMLDivElement>(null);
-  const emulatorRef = useRef<EmulatorJSPlayerHandle>(null);
+  const emulatorRef = useRef<PlayerAdapter>(null);
   const [error, setError] = useState<string | null>(null);
   const [playerReady, setPlayerReady] = useState(false);
   const [playerInstance, setPlayerInstance] = useState(0);
@@ -21,10 +25,16 @@ export function Player({ launch, onBack }: PlayerProps) {
   const handleError = useCallback((message: string) => setError(message), []);
   const config = emulatorConfig[launch.platform];
 
-  const restartPlayer = () => {
+  const restartPlayer = async () => {
+    await emulatorRef.current?.destroy().catch(() => undefined);
     setError(null);
     setPlayerReady(false);
     setPlayerInstance((current) => current + 1);
+  };
+
+  const leavePlayer = async () => {
+    await emulatorRef.current?.destroy().catch(() => undefined);
+    onBack();
   };
 
   const themeStyle = {
@@ -35,7 +45,7 @@ export function Player({ launch, onBack }: PlayerProps) {
   return (
     <main className={`player-page player-theme--${launch.platform}`} style={themeStyle}>
       <header className="player-header">
-        <button className="back-button" type="button" onClick={onBack}>
+        <button className="back-button" type="button" onClick={() => void leavePlayer()}>
           <span aria-hidden="true">←</span> Voltar
         </button>
         <div className="player-console-identity">
@@ -73,6 +83,7 @@ export function Player({ launch, onBack }: PlayerProps) {
           key={`${launch.gameId}-${n64Core}-${playerInstance}`}
           platform={launch.platform}
           romUrl={launch.romUrl}
+          romFile={launch.romFile}
           gameId={launch.gameId}
           gameName={launch.title}
           core={launch.platform === "n64" ? n64Core : undefined}
@@ -88,6 +99,7 @@ export function Player({ launch, onBack }: PlayerProps) {
         gameId={launch.gameId}
         platform={launch.platform}
         playerReady={playerReady}
+        capabilities={launch.platform === "ps2" ? PLAY_PS2_CAPABILITIES : EMULATOR_JS_CAPABILITIES}
         n64Core={launch.platform === "n64" ? n64Core : undefined}
         onN64CoreChange={launch.platform === "n64" ? (core) => {
           setError(null);

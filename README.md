@@ -1,12 +1,12 @@
 # No Lost Media Player
 
-Aplicação web independente para executar, no navegador, ROMs autorizadas fornecidas pelo usuário. Suporta NES, SNES, Game Boy Advance, Nintendo 64 e PlayStation 1 por meio do EmulatorJS. A integração de PlayStation 2 está arquitetada, mas ainda não ativa.
+Aplicação web independente para executar, no navegador, ROMs autorizadas fornecidas pelo usuário. Suporta NES, SNES, Game Boy Advance, Nintendo 64 e PlayStation 1 por meio do EmulatorJS. O PlayStation 2 usa um runtime versionado do Play! e permanece atrás de feature flag até a publicação da primeira release validada.
 
 O projeto não faz scraping, não contém ROMs comerciais e não envia arquivos locais. O catálogo No Lost Media abre os jogos compatíveis diretamente neste player.
 
 ## Requisitos e instalação
 
-- Node.js 20 ou superior
+- Node.js 22.12 ou superior
 - npm 10 ou superior
 - conexão com a internet para baixar o runtime do EmulatorJS na primeira execução
 
@@ -71,15 +71,16 @@ GamePlayer
 │   ├── N64: mupen64plus_next / parallel_n64
 │   └── PS1: pcsx_rearmed
 └── PS2Player
-    └── Play! WebAssembly (futuro)
+    └── Play! WebAssembly (iframe same-origin)
 ```
 
 - `src/components`: seleção, player, barra e adaptadores visuais.
-- `src/emulators`: configuração central das plataformas e cores.
+- `src/emulators`: configuração, contrato `PlayerAdapter`, protocolo Play! e leitores de disco.
 - `src/pages`: tela inicial e tela `/play/:platform`.
 - `src/storage/saveStorage.ts`: abstração IndexedDB pronta para dados de save, sem armazenar ROMs.
 - `public/emulator/emulatorjs/index.html`: host isolado que configura e carrega o EmulatorJS.
-- `public/emulator/ps2`: local reservado ao runtime Play! WebAssembly.
+- `emulator/ps2/index.html` e `src/ps2-host.ts`: host isolado do Play!.
+- `public/emulator/ps2/runtime`: runtime Play! instalado no build e não versionado no Git.
 
 O contrato principal não conhece a hospedagem da ROM:
 
@@ -117,9 +118,25 @@ O multiplayer exige um servidor de sinalização persistente, pois a hospedagem 
 
 O player usa esse endereço por padrão. Para usar outro servidor, defina `VITE_NETPLAY_SERVER_URL` no ambiente de build da Vercel e publique novamente. A negociação WebRTC usa STUN do Google e TURN público do OpenRelay; em produção com maior tráfego, prefira um TURN próprio ou contratado.
 
+## Runtime PlayStation 2
+
+PS2 exige Chrome ou Edge 64-bit atual, WebGL 2, pelo menos 8 GB de RAM e uma página `crossOriginIsolated`. Não existe fallback sem threads. Para desenvolvimento com uma build local do fork:
+
+```powershell
+$env:PLAY_RUNTIME_LOCAL_DIR='D:\Projetos\Play-\build_web_runtime'
+$env:VITE_PS2_ENABLED='true'
+npm run dev
+```
+
+Em produção, `play-runtime.lock.json` fixa a tag, URL e SHA-256 do manifesto. O script `prepare:play-runtime` baixa cada arquivo da release, confere tamanho e hash e grava um ponteiro same-origin. Defina `VITE_PS2_ENABLED=true` somente depois de substituir o checksum provisório pela release publicada. `VITE_PS2_ROM_ORIGINS` é uma lista separada por vírgulas das origens HTTPS autorizadas para discos remotos.
+
+Arquivos PS2 locais `.iso`, `.bin`, `.chd` e `.cso` são lidos em fatias e nunca enviados. Arquivos `.bin` precisam representar uma imagem de disco completa que o Play! consiga autodetectar; conjuntos multi-track dependentes de `.cue` não são combinados pela seleção local da v1. O CDN remoto precisa responder ao probe e a todas as leituras com `206`, `Content-Range`, tamanho estável e `ETag` ou `Last-Modified`, além de CORS. Deve expor `Content-Length`, `Content-Range` e `ETag`, aceitar `Range` e não comprimir nem transformar a imagem.
+
+Controles PS2 no teclado: setas para o direcional; `A/S/X/Z` para quadrado/triângulo/círculo/X; `Q/W/E/R` para L1/L2/R1/R2; Shift esquerdo/direito para L3/R3; Enter e Backspace para Start e Select. Até dois gamepads Standard são associados às portas 1 e 2. Save states, netplay, haptics e remapeamento visual não fazem parte da v1.
+
 ## Plataformas ainda não ativadas
 
-O catálogo também possui Dreamcast, GameCube, Wii, PS2 e PS3. Eles não foram ativados nesta etapa porque não existem cores compatíveis no runtime usado ou exigem runtimes WebAssembly próprios, BIOS, isolamento por cabeçalhos e arquivos de vários gigabytes. `PS2Player` permanece separado para uma futura integração oficial do Play!; Dreamcast e os consoles baseados em Dolphin/RPCS3 também devem receber adaptadores próprios em vez de uma implementação improvisada.
+O catálogo também possui Dreamcast, GameCube, Wii e PS3. Eles não foram ativados nesta etapa porque não existem cores compatíveis no runtime usado ou exigem runtimes WebAssembly próprios, BIOS, isolamento por cabeçalhos e arquivos de vários gigabytes. Dreamcast e os consoles baseados em Dolphin/RPCS3 devem receber adaptadores próprios em vez de uma implementação improvisada.
 
 ## Integração com No Lost Media
 

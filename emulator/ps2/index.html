@@ -1,0 +1,24 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="referrer" content="no-referrer" />
+    <title>Play! WebAssembly</title>
+    <style>
+      html, body { width: 100%; height: 100%; margin: 0; overflow: hidden; background: #050609; color: #d9dce6; }
+      body { font-family: system-ui, sans-serif; }
+      #outputCanvas { display: block; width: 100%; height: 100%; outline: 0; object-fit: contain; }
+      #fatal { box-sizing: border-box; display: none; position: fixed; inset: 0; place-content: center; padding: 2rem; background: #12090b; text-align: center; }
+      #fatal strong { display: block; margin-bottom: .5rem; color: #ff8b8b; }
+      #activate { display: none; position: fixed; inset: 0; place-content: end center; padding: 2rem; pointer-events: none; }
+      #activate button { border: 1px solid #7f8cff; border-radius: .6rem; padding: .7rem 1rem; color: #fff; background: #20275fdd; font: inherit; cursor: pointer; pointer-events: auto; }
+    </style>
+  </head>
+  <body>
+    <canvas id="outputCanvas" width="640" height="480" tabindex="0"></canvas>
+    <div id="activate"><button type="button">Ativar áudio e controles</button></div>
+    <div id="fatal" role="alert"></div>
+    <script type="module" src="/src/ps2-host.ts"></script>
+  </body>
+</html>

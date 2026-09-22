@@ -1,6 +1,11 @@
 import { forwardRef, useEffect, useImperativeHandle, useMemo, useRef, useState } from "react";
 import { emulatorConfig } from "../emulators/emulatorConfig";
 import type { Platform } from "../types/game";
+import {
+  type PlayerAdapter,
+  type PlayerEventListener,
+} from "../emulators/PlayerAdapter";
+import { EmulatorJsAdapter } from "../emulators/EmulatorJsAdapter";
 
 interface EmulatorJSPlayerProps {
   platform: Exclude<Platform, "ps2">;
@@ -20,12 +25,7 @@ interface EmulatorMessage {
   state?: unknown;
 }
 
-export interface EmulatorJSPlayerHandle {
-  exportState: () => Promise<ArrayBuffer>;
-  importState: (state: ArrayBuffer) => Promise<void>;
-  openNetplay: () => Promise<void>;
-  openControls: () => Promise<void>;
-}
+export interface EmulatorJSPlayerHandle extends PlayerAdapter {}
 
 interface PendingRequest {
   resolve: (value: ArrayBuffer | void) => void;
@@ -39,6 +39,7 @@ export const EmulatorJSPlayer = forwardRef<EmulatorJSPlayerHandle, EmulatorJSPla
 ) {
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const pendingRequests = useRef(new Map<string, PendingRequest>());
+  const eventListeners = useRef(new Set<PlayerEventListener>());
   const [status, setStatus] = useState("Preparando emulador…");
   const [loading, setLoading] = useState(true);
   const netplayServer = import.meta.env.VITE_NETPLAY_SERVER_URL?.trim()
@@ -89,20 +90,15 @@ export const EmulatorJSPlayer = forwardRef<EmulatorJSPlayerHandle, EmulatorJSPla
     });
   };
 
-  useImperativeHandle(ref, () => ({
-    exportState: async () => {
-      const state = await sendCommand("export-state");
-      if (!(state instanceof ArrayBuffer)) throw new Error("O emulador não retornou um salvamento válido.");
-      return state;
-    },
-    importState: async (state) => {
-      await sendCommand("import-state", state);
-    },
-    openNetplay: async () => {
-      await sendCommand("open-netplay");
-    },
-    openControls: async () => {
-      await sendCommand("open-controls");
+  useImperativeHandle(ref, () => new EmulatorJsAdapter({
+    request: sendCommand,
+    post: (type) => iframeRef.current?.contentWindow?.postMessage(
+      { source: "no-lost-player", type },
+      window.location.origin,
+    ),
+    subscribe: (listener: PlayerEventListener) => {
+      eventListeners.current.add(listener);
+      return () => eventListeners.current.delete(listener);
     },
   }), [emulatorUrl]);
 
@@ -121,9 +117,12 @@ export const EmulatorJSPlayer = forwardRef<EmulatorJSPlayerHandle, EmulatorJSPla
       } else if (data.type === "ready") {
         setLoading(false);
         onReady?.(true);
+        eventListeners.current.forEach((listener) => listener({ state: "running" }));
       } else if (data.type === "error") {
         setLoading(false);
-        onError(typeof data.message === "string" ? data.message : "Não foi possível iniciar o emulador.");
+        const message = typeof data.message === "string" ? data.message : "Não foi possível iniciar o emulador.";
+        onError(message);
+        eventListeners.current.forEach((listener) => listener({ state: "error", message }));
       } else if (
         data.type === "state-exported"
         || data.type === "state-imported"

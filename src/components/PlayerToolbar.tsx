@@ -1,5 +1,5 @@
 import { useEffect, useState, type RefObject } from "react";
-import type { EmulatorJSPlayerHandle } from "./EmulatorJSPlayer";
+import type { PlayerAdapter, PlayerCapability } from "../emulators/PlayerAdapter";
 import { useGamepad } from "../hooks/useGamepad";
 import {
   clearSaveDirectory,
@@ -29,10 +29,11 @@ declare global {
 
 interface PlayerToolbarProps {
   playerContainer: RefObject<HTMLDivElement | null>;
-  emulatorRef: RefObject<EmulatorJSPlayerHandle | null>;
+  emulatorRef: RefObject<PlayerAdapter | null>;
   gameId: string;
   platform: Platform;
   playerReady: boolean;
+  capabilities: ReadonlySet<PlayerCapability>;
   n64Core?: string;
   onN64CoreChange?: (core: string) => void;
   onRestart: () => void;
@@ -50,6 +51,7 @@ export function PlayerToolbar({
   gameId,
   platform,
   playerReady,
+  capabilities,
   n64Core,
   onN64CoreChange,
   onRestart,
@@ -238,11 +240,13 @@ export function PlayerToolbar({
           <span className="status-dot" aria-hidden="true" />
           <span>{gamepad ? `${gamepad.id} conectado` : "Nenhum controle conectado"}</span>
         </div>
-        <span className="save-directory-status" title={saveMessage ?? undefined}>
-          {saveMessage ?? (directory
-            ? `Saves em: ${directory.name}`
-            : "Saves automáticos: No Lost Media Player/Saves (armazenamento do navegador)")}
-        </span>
+        {capabilities.has("save-state") && (
+          <span className="save-directory-status" title={saveMessage ?? undefined}>
+            {saveMessage ?? (directory
+              ? `Saves em: ${directory.name}`
+              : "Saves automáticos: No Lost Media Player/Saves (armazenamento do navegador)")}
+          </span>
+        )}
       </div>
       <div className="toolbar-actions">
         {platform === "n64" && n64Core && onN64CoreChange && (
@@ -255,38 +259,46 @@ export function PlayerToolbar({
             {N64_CORES.map((core) => <option key={core.value} value={core.value}>{core.label}</option>)}
           </select>
         )}
-        <button
-          type="button"
-          className="toolbar-button toolbar-button--online"
-          onClick={openNetplay}
-          disabled={!playerReady || busy}
-          title="Crie uma sala ou entre na sala de outro jogador"
-        >
-          Jogar online
-        </button>
-        <button
-          type="button"
-          className="toolbar-button"
-          onClick={openControls}
-          disabled={!playerReady || busy}
-          title="Configure as teclas e os controles de cada jogador"
-        >
-          Controles
-        </button>
-        <button type="button" className="toolbar-button" onClick={chooseDirectory} disabled={busy}>
-          Pasta de saves
-        </button>
-        {directory && (
-          <button type="button" className="toolbar-button toolbar-button--quiet" onClick={useBrowserDirectory} disabled={busy}>
-            Usar padrão
+        {capabilities.has("netplay") && (
+          <button
+            type="button"
+            className="toolbar-button toolbar-button--online"
+            onClick={openNetplay}
+            disabled={!playerReady || busy}
+            title="Crie uma sala ou entre na sala de outro jogador"
+          >
+            Jogar online
           </button>
         )}
-        <button type="button" className="toolbar-button" onClick={saveGame} disabled={!playerReady || busy}>
-          Salvar
-        </button>
-        <button type="button" className="toolbar-button" onClick={loadGame} disabled={!playerReady || busy}>
-          Carregar
-        </button>
+        {capabilities.has("controls") && (
+          <button
+            type="button"
+            className="toolbar-button"
+            onClick={openControls}
+            disabled={!playerReady || busy}
+            title="Configure as teclas e os controles de cada jogador"
+          >
+            Controles
+          </button>
+        )}
+        {capabilities.has("save-state") && (
+          <>
+            <button type="button" className="toolbar-button" onClick={chooseDirectory} disabled={busy}>
+              Pasta de saves
+            </button>
+            {directory && (
+              <button type="button" className="toolbar-button toolbar-button--quiet" onClick={useBrowserDirectory} disabled={busy}>
+                Usar padrão
+              </button>
+            )}
+            <button type="button" className="toolbar-button" onClick={saveGame} disabled={!playerReady || busy}>
+              Salvar
+            </button>
+            <button type="button" className="toolbar-button" onClick={loadGame} disabled={!playerReady || busy}>
+              Carregar
+            </button>
+          </>
+        )}
         <button
           type="button"
           className="toolbar-button toolbar-button--restart"

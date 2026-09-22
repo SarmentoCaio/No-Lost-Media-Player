@@ -35,6 +35,7 @@ export function Home({ onStart }: HomeProps) {
         title,
         platform,
         romUrl: URL.createObjectURL(file),
+        romFile: file,
         source: "local",
       });
       return;
