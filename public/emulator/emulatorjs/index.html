@@ -45,6 +45,9 @@
         const netplayServer = params.get("netplayServer");
         let shuttingDown = false;
         let pausedInBackground = false;
+        let desiredVolume = 0.8;
+        let externalInputEnabled = false;
+        let externalKeyboardCodes = new Set();
 
         const shutdownEmulator = () => {
           const emulator = window.EJS_emulator;
@@ -94,6 +97,20 @@
           emulator.keyChange?.(event);
         };
 
+        // O documento do iframe é quem recebe o teclado enquanto o canvas está
+        // focado. Encaminhamos a entrada bruta ao InputManager do React, que é a
+        // única camada responsável por mapear e acionar o core.
+        const captureExternalKeyboard = (event) => {
+          if (!externalInputEnabled || event.isComposing || event.metaKey || event.ctrlKey || event.altKey) return;
+          const emulator = window.EJS_emulator;
+          const popup = emulator?.controlPopup?.parentElement?.parentElement;
+          if (popup && !popup.hasAttribute("hidden")) return;
+          if (!externalKeyboardCodes.has(event.code)) return;
+          event.preventDefault();
+          event.stopImmediatePropagation();
+          notify("keyboard-input", "", { code: event.code, pressed: event.type === "keydown", repeat: event.repeat });
+        };
+
         if (!core || !rom) {
           fail("Os parâmetros do emulador estão incompletos.");
           return;
@@ -129,6 +146,47 @@
 
           if (data.type === "shutdown") {
             shutdownEmulator();
+            return;
+          }
+
+          if (data.type === "configure-input") {
+            externalInputEnabled = true;
+            externalKeyboardCodes = new Set(Array.isArray(data.codes) ? data.codes.filter((code) => typeof code === "string") : []);
+            const emulator = window.EJS_emulator;
+            if (emulator) {
+              emulator.toggleVirtualGamepad?.(false);
+              if (Array.isArray(emulator.gamepadSelection)) emulator.gamepadSelection.fill("");
+            }
+            return;
+          }
+
+          if (data.type === "set-volume") {
+            desiredVolume = Math.min(1, Math.max(0, Number(data.volume) || 0));
+            const emulator = window.EJS_emulator;
+            if (emulator?.setVolume) {
+              emulator.volume = desiredVolume;
+              emulator.muted = desiredVolume === 0;
+              emulator.setVolume(desiredVolume);
+              if (desiredVolume > 0) emulator.Module?.AL?.currentCtx?.audioCtx?.resume?.().catch?.(() => undefined);
+            }
+            return;
+          }
+
+          if (data.type === "input") {
+            const emulator = window.EJS_emulator;
+            const coreIndex = Number(data.coreIndex);
+            const rawValue = Math.min(1, Math.max(0, Number(data.value) || 0));
+            if (!emulator?.gameManager || !Number.isInteger(coreIndex) || coreIndex < 0 || coreIndex > 29) return;
+            if (Array.isArray(emulator.gamepadSelection)) emulator.gamepadSelection.fill("");
+            const value = emulator.analogAxes?.includes(coreIndex) ? Math.round(rawValue * 0x7fff) : (rawValue >= 0.5 ? 1 : 0);
+            emulator.gameManager.simulateInput(0, coreIndex, value);
+            return;
+          }
+
+          if (data.type === "release-all-inputs") {
+            const emulator = window.EJS_emulator;
+            if (!emulator?.gameManager) return;
+            for (let index = 0; index < 30; index += 1) emulator.gameManager.simulateInput(0, index, 0);
             return;
           }
 
@@ -188,6 +246,8 @@
         window.addEventListener("pagehide", shutdownEmulator);
         document.addEventListener("visibilitychange", syncPageVisibility);
         document.addEventListener("keydown", captureKeyboardRemap, true);
+        document.addEventListener("keydown", captureExternalKeyboard, true);
+        document.addEventListener("keyup", captureExternalKeyboard, true);
 
         window.addEventListener("error", (event) => {
           if (event.message) fail("O EmulatorJS encontrou um erro ao carregar o jogo.");
@@ -216,6 +276,7 @@
           window.EJS_core = core;
           window.EJS_gameUrl = rom;
           window.EJS_gameName = name;
+          window.EJS_volume = desiredVolume;
           if (Number.isSafeInteger(gameId) && gameId > 0) window.EJS_gameID = gameId;
           // O netplay está disponível a partir do 4.3.0-pre. Essa versão também
           // contém a correção do PCSX-ReARMed usada pelos jogos japoneses.
@@ -254,6 +315,15 @@
           window.EJS_backgroundColor = "#050609";
           window.EJS_color = "#8b6cff";
           window.EJS_onGameStart = () => {
+            const emulator = window.EJS_emulator;
+            emulator.toggleVirtualGamepad?.(false);
+            if (emulator.virtualGamepad) emulator.virtualGamepad.style.setProperty("display", "none", "important");
+            if (Array.isArray(emulator.gamepadSelection)) emulator.gamepadSelection.fill("");
+            // Evita que o polling nativo injete uma segunda entrada em paralelo
+            // com o InputManager da aplicação.
+            if (externalInputEnabled) emulator.gamepad?.terminate?.();
+            emulator.volume = desiredVolume;
+            emulator.setVolume?.(desiredVolume);
             notify("ready", "Jogo iniciado");
             syncPageVisibility();
           };

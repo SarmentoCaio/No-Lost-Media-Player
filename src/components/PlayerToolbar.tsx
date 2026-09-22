@@ -1,6 +1,5 @@
 import { useEffect, useState, type RefObject } from "react";
 import type { EmulatorJSPlayerHandle } from "./EmulatorJSPlayer";
-import { useGamepad } from "../hooks/useGamepad";
 import {
   clearSaveDirectory,
   getBrowserSaveDirectory,
@@ -11,6 +10,8 @@ import {
   requestPersistentStorage,
 } from "../storage/saveStorage";
 import type { Platform } from "../types/game";
+import type { AudioSettings } from "../input/controlTypes";
+import { VolumeControl } from "./controls/VolumeControl";
 
 interface DirectoryHandleWithPermission extends FileSystemDirectoryHandle {
   queryPermission?: (descriptor: { mode: "readwrite" }) => Promise<PermissionState>;
@@ -37,6 +38,10 @@ interface PlayerToolbarProps {
   onN64CoreChange?: (core: string) => void;
   onRestart: () => void;
   onError: (message: string) => void;
+  gamepadName: string | null;
+  audio: AudioSettings;
+  onAudioChange: (audio: AudioSettings) => void;
+  onOpenControls: () => void;
 }
 
 const N64_CORES = [
@@ -54,8 +59,11 @@ export function PlayerToolbar({
   onN64CoreChange,
   onRestart,
   onError,
+  gamepadName,
+  audio,
+  onAudioChange,
+  onOpenControls,
 }: PlayerToolbarProps) {
-  const gamepad = useGamepad();
   const [directory, setDirectory] = useState<DirectoryHandleWithPermission | null>(null);
   const [busy, setBusy] = useState(false);
   const [saveMessage, setSaveMessage] = useState<string | null>(null);
@@ -193,14 +201,7 @@ export function PlayerToolbar({
     }
   };
 
-  const openControls = async () => {
-    if (!emulatorRef.current) return;
-    try {
-      await emulatorRef.current.openControls();
-    } catch (error) {
-      onError(error instanceof Error ? error.message : "Não foi possível abrir o mapeamento de controles.");
-    }
-  };
+  const openControls = () => onOpenControls();
 
   const chooseDirectory = async () => {
     try {
@@ -231,12 +232,23 @@ export function PlayerToolbar({
     }
   };
 
+  useEffect(() => {
+    const handlePlayerCommand = (event: Event) => {
+      const command = (event as CustomEvent<string>).detail;
+      if (command === "save") void saveGame();
+      else if (command === "load") void loadGame();
+      else if (command === "controls") openControls();
+    };
+    window.addEventListener("no-lost-player-command", handlePlayerCommand);
+    return () => window.removeEventListener("no-lost-player-command", handlePlayerCommand);
+  });
+
   return (
     <div className="player-toolbar">
       <div className="toolbar-statuses">
-        <div className={`gamepad-status${gamepad ? " gamepad-status--connected" : ""}`}>
+        <div className={`gamepad-status${gamepadName ? " gamepad-status--connected" : ""}`}>
           <span className="status-dot" aria-hidden="true" />
-          <span>{gamepad ? `${gamepad.id} conectado` : "Nenhum controle conectado"}</span>
+          <span>{gamepadName ? `${gamepadName} conectado` : "Nenhum controle conectado"}</span>
         </div>
         <span className="save-directory-status" title={saveMessage ?? undefined}>
           {saveMessage ?? (directory
@@ -245,6 +257,7 @@ export function PlayerToolbar({
         </span>
       </div>
       <div className="toolbar-actions">
+        <VolumeControl audio={audio} onChange={onAudioChange} compact />
         {platform === "n64" && n64Core && onN64CoreChange && (
           <select
             className="toolbar-select"
@@ -268,7 +281,7 @@ export function PlayerToolbar({
           type="button"
           className="toolbar-button"
           onClick={openControls}
-          disabled={!playerReady || busy}
+          disabled={busy}
           title="Configure as teclas e os controles de cada jogador"
         >
           Controles

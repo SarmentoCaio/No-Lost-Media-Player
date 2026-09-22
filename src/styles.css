@@ -192,6 +192,158 @@ button:focus-visible, input:focus-visible, select:focus-visible { outline: 2px s
 .toolbar-button--restart { color: #ffd1c7; border-color: #6b3b35; }
 .toolbar-button--quiet { color: #8c94a3; }
 .toolbar-select { min-height: 38px; padding: 0 30px 0 11px; border: 1px solid #303542; border-radius: 8px; background: #171a22; color: #c8ccd5; font-size: 12px; }
+
+/* Unified audio */
+.volume-control { display: flex; min-width: 210px; align-items: center; gap: 9px; padding: 8px 10px; border: 1px solid #303542; border-radius: 10px; background: #10131a; }
+.volume-control button { display: grid; width: 28px; height: 28px; flex: none; place-items: center; padding: 0; border: 0; border-radius: 7px; background: #ffffff08; cursor: pointer; }
+.volume-control input { width: 130px; height: 5px; flex: 1; border-radius: 99px; appearance: none; background: linear-gradient(90deg, var(--console-accent) var(--volume-value), #353a46 var(--volume-value)); accent-color: var(--console-accent); cursor: pointer; }
+.volume-control input::-webkit-slider-thumb { width: 15px; height: 15px; border: 2px solid white; border-radius: 50%; appearance: none; background: var(--console-accent); box-shadow: 0 2px 8px #0009; }
+.volume-control output { width: 34px; color: #9299a8; font: 700 10px/1 ui-monospace, monospace; text-align: right; }
+.volume-control--compact { min-width: 180px; padding: 4px 8px; }
+
+/* Controller configuration */
+.controls-modal { position: fixed; z-index: 1000; inset: 0; display: grid; place-items: center; padding: 22px; }
+.controls-modal__backdrop { position: absolute; inset: 0; width: 100%; border: 0; background: #020308d9; backdrop-filter: blur(14px); cursor: default; }
+.controls-panel { position: relative; display: flex; overflow: hidden; width: min(1240px, 100%); max-height: min(900px, calc(100vh - 44px)); flex-direction: column; border: 1px solid color-mix(in srgb, var(--console-accent) 35%, #343946); border-radius: 22px; background: linear-gradient(145deg, #151923, #0b0e14 70%); box-shadow: 0 35px 120px #000c, 0 0 65px color-mix(in srgb, var(--console-accent) 10%, transparent); }
+.controls-panel__header { display: flex; align-items: flex-start; justify-content: space-between; gap: 20px; padding: 24px 26px 17px; }
+.controls-panel__header span { color: var(--console-accent); font: 900 10px/1 ui-monospace, monospace; letter-spacing: .18em; }
+.controls-panel__header h2 { margin: 6px 0 3px; font-size: 24px; letter-spacing: -.035em; }
+.controls-panel__header p { margin: 0; color: #7f8797; font-size: 12px; }
+.controls-panel__close { width: 38px; height: 38px; border: 1px solid #343a48; border-radius: 11px; background: #1a1f29; color: #aab0bc; cursor: pointer; font-size: 24px; }
+.controls-platforms { display: flex; overflow-x: auto; gap: 6px; padding: 0 26px 18px; scrollbar-width: thin; }
+.controls-platforms button { flex: none; padding: 8px 12px; border: 1px solid #303643; border-radius: 999px; background: #11151d; color: #858d9c; cursor: pointer; font-size: 11px; font-weight: 750; }
+.controls-platforms button.is-active { border-color: var(--console-accent); background: color-mix(in srgb, var(--console-accent) 16%, #11151d); color: white; box-shadow: 0 0 18px color-mix(in srgb, var(--console-accent) 15%, transparent); }
+.controls-panel__grid { display: grid; min-height: 0; grid-template-columns: minmax(420px, 1.12fr) minmax(380px, .88fr); gap: 16px; padding: 0 26px; }
+.controls-visual-card, .controls-bindings-card { min-height: 0; border: 1px solid #272d38; border-radius: 17px; background: #080b10b8; }
+.controls-visual-card { position: relative; display: grid; overflow: hidden; min-height: 470px; place-items: center; padding: 24px; background: radial-gradient(circle at 50% 45%, color-mix(in srgb, var(--console-accent) 13%, transparent), transparent 55%), #080b10; }
+.controls-visual-card::before { content: "VISUALIZAÇÃO EM TEMPO REAL"; position: absolute; top: 14px; left: 16px; color: #596170; font: 800 8px/1 ui-monospace, monospace; letter-spacing: .15em; }
+.controls-live-status { position: absolute; right: 15px; bottom: 13px; display: flex; max-width: 55%; align-items: center; gap: 7px; overflow: hidden; color: #747c8b; font-size: 10px; text-overflow: ellipsis; white-space: nowrap; }
+.controls-live-status span { width: 6px; height: 6px; flex: none; border-radius: 50%; background: #555d69; }
+.controls-live-status span.is-online { background: #4fdb92; box-shadow: 0 0 10px #4fdb92; }
+.controls-bindings-card { display: flex; overflow: hidden; flex-direction: column; }
+.controls-bindings-card__title { display: flex; align-items: center; justify-content: space-between; padding: 16px; border-bottom: 1px solid #252a34; }
+.controls-bindings-card__title h3 { margin: 0; font-size: 14px; }
+.controls-bindings-card__title span { color: #747c8b; font-size: 10px; }
+.binding-list { overflow: auto; min-height: 0; padding: 0 8px 8px; scrollbar-color: #3d4350 transparent; }
+.binding-list__head, .binding-row { display: grid; grid-template-columns: minmax(115px, 1fr) minmax(112px, .8fr) minmax(112px, .8fr); align-items: center; gap: 7px; }
+.binding-list__head { position: sticky; z-index: 2; top: 0; padding: 10px 8px 7px; background: #0c1016; color: #626a78; font: 800 8px/1 ui-monospace, monospace; letter-spacing: .1em; text-transform: uppercase; }
+.binding-row { min-height: 45px; padding: 5px 7px; border-top: 1px solid #20252e; border-radius: 9px; transition: background .15s, box-shadow .15s; }
+.binding-row.is-listening { background: color-mix(in srgb, var(--console-accent) 13%, #11151c); box-shadow: inset 3px 0 var(--console-accent); }
+.binding-row__name { display: flex; min-width: 0; align-items: center; gap: 9px; overflow: hidden; color: #c5cad4; font-size: 11px; text-overflow: ellipsis; white-space: nowrap; }
+.binding-row__name i { display: grid; overflow: hidden; width: 38px; height: 27px; flex: none; place-items: center; border: 1px solid #3a404c; border-radius: 7px; background: #181c24; color: var(--console-accent); font-size: 8px; font-style: normal; font-weight: 900; }
+.binding-row button { overflow: hidden; min-height: 31px; padding: 0 8px; border: 1px solid #303642; border-radius: 7px; background: #151921; color: #aeb4bf; cursor: pointer; font: 700 10px/1 ui-monospace, monospace; text-overflow: ellipsis; white-space: nowrap; }
+.binding-row button:hover { border-color: var(--console-accent); color: white; }
+.binding-row.is-listening button { color: var(--console-accent); }
+.controls-panel__footer { display: flex; align-items: center; justify-content: flex-end; gap: 9px; padding: 16px 26px 22px; }
+.controls-panel__footer .secondary-button, .controls-panel__footer .toolbar-button { min-height: 40px; margin: 0; }
+
+/* Console silhouettes */
+.controller-viewer { width: min(600px, 100%); aspect-ratio: 1.65; filter: drop-shadow(0 25px 30px #0009); }
+.controller-viewer__body { position: relative; width: 100%; height: 100%; border: 2px solid color-mix(in srgb, var(--console-accent) 25%, #454b57); background: linear-gradient(155deg, #3b404b, #1d222b 62%, #151920); box-shadow: inset 0 2px #ffffff18, inset 0 -8px 18px #0006; }
+.controller-viewer--rectangle .controller-viewer__body { border-radius: 13px; }
+.controller-viewer--rounded .controller-viewer__body { border-radius: 46% 46% 35% 35% / 34% 34% 46% 46%; }
+.controller-viewer--handheld .controller-viewer__body { border-radius: 45% 45% 48% 48% / 28% 28% 38% 38%; background: linear-gradient(155deg, #36304c, #211d32); }
+.controller-viewer--trident .controller-viewer__body { clip-path: polygon(12% 4%, 38% 16%, 50% 5%, 62% 16%, 88% 4%, 100% 24%, 82% 94%, 66% 58%, 58% 98%, 50% 65%, 42% 98%, 34% 58%, 18% 94%, 0 24%); border-radius: 32% 32% 18% 18%; }
+.controller-viewer--dual-grip .controller-viewer__body { border-radius: 42% 42% 30% 30% / 32% 32% 50% 50%; clip-path: polygon(13% 4%, 38% 12%, 62% 12%, 87% 4%, 100% 35%, 88% 96%, 68% 76%, 32% 76%, 12% 96%, 0 35%); }
+.controller-viewer__dpad { position: absolute; left: 22%; top: 50%; width: 112px; height: 112px; transform: translate(-50%, -50%); }
+.controller-viewer--n64 .controller-viewer__dpad { left: 18%; top: 52%; transform: translate(-50%, -50%) scale(.72); }
+.controller-viewer__dpad.is-listening { border-radius: 50%; box-shadow: 0 0 0 3px var(--console-accent), 0 0 25px var(--console-accent); animation: control-pulse .85s ease-in-out infinite alternate; }
+.controller-viewer__analog { position: absolute; width: 72px; height: 72px; transform: translate(-50%, -50%); }
+.controller-button { position: absolute; display: grid; min-width: 38px; height: 38px; place-items: center; padding: 0 7px; border: 2px solid #10131a; border-radius: 50%; background: radial-gradient(circle at 35% 27%, #59606c, #252a33 58%); color: #d8dce4; box-shadow: 0 4px 9px #0008, inset 0 1px #ffffff26; cursor: pointer; font: 900 11px/1 ui-monospace, monospace; transform: translate(-50%, -50%); transition: transform .08s, box-shadow .08s, background .08s; }
+.controller-button--start, .controller-button--select { min-width: 54px; height: 22px; border-radius: 999px; font-size: 7px; }
+.controller-button--l, .controller-button--r, .controller-button--l1, .controller-button--r1, .controller-button--l2, .controller-button--r2 { min-width: 72px; height: 25px; border-radius: 10px; }
+.controller-button.is-active { background: var(--console-accent); color: white; box-shadow: 0 0 0 3px #fff5, 0 0 28px var(--console-accent); transform: translate(-50%, -50%) scale(.92); }
+.controller-button.is-listening { border-color: white; box-shadow: 0 0 0 3px var(--console-accent), 0 0 28px var(--console-accent); animation: control-pulse .85s ease-in-out infinite alternate; }
+@keyframes control-pulse { to { filter: brightness(1.35); transform: translate(-50%, -50%) scale(1.08); } }
+
+.dpad { position: relative; width: 100%; height: 100%; touch-action: none; user-select: none; -webkit-user-select: none; }
+.dpad__key { position: absolute; display: grid; width: 36%; height: 36%; place-items: center; border: 1px solid #11151b; background: linear-gradient(145deg, #414751, #242932); color: #11151b; box-shadow: inset 0 1px #ffffff1c; font-size: 10px; }
+.dpad__key--up { top: 0; left: 32%; border-radius: 8px 8px 0 0; }
+.dpad__key--right { top: 32%; right: 0; border-radius: 0 8px 8px 0; }
+.dpad__key--down { bottom: 0; left: 32%; border-radius: 0 0 8px 8px; }
+.dpad__key--left { top: 32%; left: 0; border-radius: 8px 0 0 8px; }
+.dpad__center { position: absolute; top: 32%; left: 32%; width: 36%; height: 36%; border-radius: 3px; background: #292e37; }
+.dpad__key.is-active { background: var(--console-accent); color: white; box-shadow: 0 0 18px var(--console-accent); }
+.analog-stick { position: relative; width: 100%; height: 100%; border-radius: 50%; background: repeating-radial-gradient(circle, #161a21 0 8px, #303640 9px 11px); box-shadow: inset 0 0 12px #000, 0 3px 8px #0008; touch-action: none; user-select: none; }
+.analog-stick__gate { position: absolute; inset: 11%; border: 1px solid #555d68; border-radius: 50%; }
+.analog-stick__knob { position: absolute; top: 50%; left: 50%; width: 46%; height: 46%; border: 2px solid #151920; border-radius: 50%; background: radial-gradient(circle at 35% 30%, #747c87, #272c35 65%); box-shadow: 0 4px 8px #000a; }
+
+/* Custom touch controls and in-game menu */
+.touch-controller, .mobile-game-menu { display: none; }
+.touch-controller { position: absolute; z-index: 8; inset: 0; overflow: hidden; pointer-events: none; touch-action: none; user-select: none; -webkit-user-select: none; }
+.touch-control-element { position: absolute; pointer-events: auto; touch-action: none; user-select: none; -webkit-user-select: none; }
+.touch-control-element--dpad { width: clamp(104px, 25vw, 150px); height: clamp(104px, 25vw, 150px); }
+.touch-control-element--analog { width: clamp(86px, 21vw, 126px); height: clamp(86px, 21vw, 126px); }
+.touch-action-button { display: grid; width: clamp(44px, 11vw, 66px); height: clamp(44px, 11vw, 66px); place-items: center; padding: 0; border: 2px solid #ffffff5c; border-radius: 50%; background: color-mix(in srgb, var(--console-accent) 34%, #121720aa); color: white; box-shadow: inset 0 0 0 4px #0002, 0 4px 18px #0007; font: 900 clamp(10px, 2.8vw, 15px)/1 ui-monospace, monospace; }
+.touch-action-button--start, .touch-action-button--select { width: clamp(66px, 17vw, 96px); height: 31px; border-radius: 999px; font-size: 8px; }
+.touch-action-button--l, .touch-action-button--r, .touch-action-button--l1, .touch-action-button--r1, .touch-action-button--l2, .touch-action-button--r2 { width: clamp(70px, 19vw, 110px); height: 30px; border-radius: 11px; }
+.touch-action-button.is-active { background: var(--console-accent); box-shadow: 0 0 25px var(--console-accent); filter: brightness(1.35); }
+.touch-controller.is-disabled { pointer-events: none; opacity: .2; }
+.mobile-game-menu { position: absolute; z-index: 12; top: max(10px, env(safe-area-inset-top)); left: max(10px, env(safe-area-inset-left)); }
+.mobile-game-menu__toggle { width: 40px; height: 40px; border: 1px solid #ffffff2d; border-radius: 11px; background: #070a10cc; color: white; backdrop-filter: blur(10px); }
+.mobile-game-menu__panel { display: grid; position: absolute; top: 46px; left: 0; width: min(290px, calc(100vw - 28px)); gap: 7px; padding: 13px; border: 1px solid #343b48; border-radius: 14px; background: #0b0f17ed; box-shadow: 0 18px 55px #000c; backdrop-filter: blur(18px); }
+.mobile-game-menu__panel > button { min-height: 38px; border: 1px solid #313745; border-radius: 8px; background: #171c25; color: #d7dbe3; }
+.mobile-game-menu__panel .volume-control { min-width: 0; }
+
+/* Touch layout editor */
+.touch-editor { position: absolute; z-index: 30; inset: 0; display: flex; min-height: 0; flex-direction: column; background: #060910f5; touch-action: none; user-select: none; -webkit-user-select: none; }
+.touch-editor__toolbar { display: flex; z-index: 2; align-items: center; gap: 10px; padding: max(10px, env(safe-area-inset-top)) max(12px, env(safe-area-inset-right)) 10px max(12px, env(safe-area-inset-left)); border-bottom: 1px solid #303644; background: #10151de8; }
+.touch-editor__toolbar > div { display: flex; min-width: 190px; flex-direction: column; }
+.touch-editor__toolbar strong { font-size: 12px; }
+.touch-editor__toolbar span { color: #7e8796; font-size: 9px; }
+.touch-editor__toolbar label { display: flex; align-items: center; gap: 6px; color: #9ea5b2; font-size: 10px; }
+.touch-editor__toolbar input[type="range"] { width: 90px; accent-color: var(--console-accent); }
+.touch-editor__surface { position: relative; overflow: hidden; flex: 1; background-image: linear-gradient(#ffffff0a 1px, transparent 1px), linear-gradient(90deg, #ffffff0a 1px, transparent 1px); background-size: 24px 24px; }
+.touch-editor__safe-area { position: absolute; inset: max(16px, env(safe-area-inset-top)) max(16px, env(safe-area-inset-right)) max(16px, env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left)); border: 1px dashed #7d879744; border-radius: 18px; pointer-events: none; }
+.touch-editor__safe-area span { position: absolute; top: 6px; right: 8px; color: #707988; font: 700 8px/1 ui-monospace, monospace; letter-spacing: .1em; }
+.touch-editor__item { position: absolute; min-width: 62px; min-height: 42px; padding: 8px; border: 2px solid #77808f; border-radius: 12px; background: #232a36; color: white; cursor: grab; touch-action: none; font-size: 9px; font-weight: 800; }
+.touch-editor__item.is-selected { border-color: var(--console-accent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--console-accent) 30%, transparent), 0 0 25px color-mix(in srgb, var(--console-accent) 30%, transparent); }
+.touch-editor__item.is-hidden { border-style: dashed; opacity: .2 !important; }
+
+@media (hover: none) and (pointer: coarse) {
+  .touch-controller, .mobile-game-menu { display: block; }
+  .player-shell-brand { display: none; }
+  .emulator-frame { pointer-events: auto; }
+}
+
+@media (max-width: 900px) {
+  .controls-panel__grid { grid-template-columns: 1fr; overflow-y: auto; }
+  .controls-visual-card { min-height: 360px; }
+  .controls-bindings-card { min-height: 390px; }
+  .controls-panel__footer { flex-wrap: wrap; }
+  .touch-editor__toolbar { flex-wrap: wrap; }
+  .touch-editor__toolbar > div { width: 100%; }
+}
+
+@media (max-width: 600px) {
+  .controls-modal { padding: 0; }
+  .controls-panel { width: 100%; height: 100%; max-height: none; border: 0; border-radius: 0; }
+  .controls-panel__header { padding: max(16px, env(safe-area-inset-top)) 15px 12px; }
+  .controls-panel__header p { display: none; }
+  .controls-platforms { padding: 0 15px 12px; }
+  .controls-panel__grid { padding: 0 12px; }
+  .controls-visual-card { min-height: 250px; padding: 20px; }
+  .controller-viewer { width: min(390px, 100%); }
+  .controller-viewer__dpad { width: 75px; height: 75px; }
+  .controller-button { min-width: 29px; height: 29px; font-size: 8px; }
+  .controller-button--start, .controller-button--select { min-width: 42px; height: 18px; font-size: 6px; }
+  .controller-button--l, .controller-button--r, .controller-button--l1, .controller-button--r1, .controller-button--l2, .controller-button--r2 { min-width: 48px; height: 20px; }
+  .controller-viewer__analog { width: 50px; height: 50px; }
+  .binding-list__head, .binding-row { grid-template-columns: minmax(95px, 1fr) minmax(88px, .8fr) minmax(88px, .8fr); }
+  .controls-panel__footer { padding: 10px 12px max(12px, env(safe-area-inset-bottom)); }
+  .controls-panel__footer button { flex: 1; font-size: 10px; }
+  .volume-control--compact { grid-column: 1 / -1; }
+  .touch-editor__toolbar input[type="range"] { width: 70px; }
+}
+
+@media (orientation: landscape) and (hover: none) and (pointer: coarse) {
+  .player-header, .player-toolbar { display: none; }
+  .player-shell { width: 100vw; height: 100dvh; margin: 0; border: 0; border-radius: 0; }
+  .touch-control-element--dpad { width: clamp(96px, 23vh, 140px); height: clamp(96px, 23vh, 140px); }
+  .touch-control-element--analog { width: clamp(82px, 20vh, 118px); height: clamp(82px, 20vh, 118px); }
+  .touch-action-button { width: clamp(42px, 11vh, 64px); height: clamp(42px, 11vh, 64px); font-size: clamp(10px, 2.7vh, 14px); }
+  .touch-action-button--start, .touch-action-button--select { width: clamp(62px, 17vh, 92px); height: 28px; }
+}
 .ps2-placeholder { width: min(620px, calc(100% - 40px)); padding: 42px; border: 1px solid #292e39; border-radius: 18px; background: #11141b; text-align: center; }
 .ps2-placeholder__chip { display: inline-flex; padding: 7px 10px; border-radius: 7px; background: #40252a; color: #ff9986; font-size: 11px; font-weight: 900; letter-spacing: .12em; }
 .ps2-placeholder h2 { margin: 18px 0 10px; font-size: 24px; }

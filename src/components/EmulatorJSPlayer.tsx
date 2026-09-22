@@ -1,6 +1,7 @@
 import { forwardRef, useEffect, useImperativeHandle, useMemo, useRef, useState } from "react";
 import { emulatorConfig } from "../emulators/emulatorConfig";
 import type { Platform } from "../types/game";
+import type { RawKeyboardInput } from "../input/controlTypes";
 
 interface EmulatorJSPlayerProps {
   platform: Exclude<Platform, "ps2">;
@@ -8,6 +9,9 @@ interface EmulatorJSPlayerProps {
   gameName: string;
   gameId: string;
   core?: string;
+  volume: number;
+  keyboardCodes: string[];
+  onKeyboardInput: (input: RawKeyboardInput) => void;
   onError: (message: string) => void;
   onReady?: (ready: boolean) => void;
 }
@@ -18,6 +22,9 @@ interface EmulatorMessage {
   message?: unknown;
   requestId?: unknown;
   state?: unknown;
+  code?: unknown;
+  pressed?: unknown;
+  repeat?: unknown;
 }
 
 export interface EmulatorJSPlayerHandle {
@@ -25,6 +32,10 @@ export interface EmulatorJSPlayerHandle {
   importState: (state: ArrayBuffer) => Promise<void>;
   openNetplay: () => Promise<void>;
   openControls: () => Promise<void>;
+  setVolume: (volume: number) => void;
+  setInput: (coreIndex: number, value: number) => void;
+  releaseAllInputs: () => void;
+  configureInput: (codes: string[]) => void;
 }
 
 interface PendingRequest {
@@ -34,7 +45,7 @@ interface PendingRequest {
 }
 
 export const EmulatorJSPlayer = forwardRef<EmulatorJSPlayerHandle, EmulatorJSPlayerProps>(function EmulatorJSPlayer(
-  { platform, romUrl, gameName, gameId, core, onError, onReady },
+  { platform, romUrl, gameName, gameId, core, volume, keyboardCodes, onKeyboardInput, onError, onReady },
   ref,
 ) {
   const iframeRef = useRef<HTMLIFrameElement>(null);
@@ -89,6 +100,13 @@ export const EmulatorJSPlayer = forwardRef<EmulatorJSPlayerHandle, EmulatorJSPla
     });
   };
 
+  const post = (message: Record<string, unknown>) => {
+    iframeRef.current?.contentWindow?.postMessage(
+      { source: "no-lost-player", ...message },
+      window.location.origin,
+    );
+  };
+
   useImperativeHandle(ref, () => ({
     exportState: async () => {
       const state = await sendCommand("export-state");
@@ -104,6 +122,10 @@ export const EmulatorJSPlayer = forwardRef<EmulatorJSPlayerHandle, EmulatorJSPla
     openControls: async () => {
       await sendCommand("open-controls");
     },
+    setVolume: (nextVolume) => post({ type: "set-volume", volume: nextVolume }),
+    setInput: (coreIndex, value) => post({ type: "input", coreIndex, value }),
+    releaseAllInputs: () => post({ type: "release-all-inputs" }),
+    configureInput: (codes) => post({ type: "configure-input", codes }),
   }), [emulatorUrl]);
 
   useEffect(() => {
@@ -124,6 +146,10 @@ export const EmulatorJSPlayer = forwardRef<EmulatorJSPlayerHandle, EmulatorJSPla
       } else if (data.type === "error") {
         setLoading(false);
         onError(typeof data.message === "string" ? data.message : "Não foi possível iniciar o emulador.");
+      } else if (data.type === "keyboard-input") {
+        if (typeof data.code === "string" && typeof data.pressed === "boolean") {
+          onKeyboardInput({ code: data.code, pressed: data.pressed, repeat: data.repeat === true });
+        }
       } else if (
         data.type === "state-exported"
         || data.type === "state-imported"
@@ -168,7 +194,15 @@ export const EmulatorJSPlayer = forwardRef<EmulatorJSPlayerHandle, EmulatorJSPla
       }
       pendingRequests.current.clear();
     };
-  }, [emulatorUrl, onError, onReady]);
+  }, [emulatorUrl, onError, onKeyboardInput, onReady]);
+
+  useEffect(() => {
+    post({ type: "set-volume", volume });
+  }, [volume]);
+
+  useEffect(() => {
+    post({ type: "configure-input", codes: keyboardCodes });
+  }, [keyboardCodes]);
 
   return (
     <div className="emulator-frame-wrap">
@@ -184,6 +218,10 @@ export const EmulatorJSPlayer = forwardRef<EmulatorJSPlayerHandle, EmulatorJSPla
         src={emulatorUrl}
         title={`Emulador — ${gameName}`}
         allow="fullscreen; gamepad; autoplay"
+        onLoad={() => {
+          post({ type: "configure-input", codes: keyboardCodes });
+          post({ type: "set-volume", volume });
+        }}
         allowFullScreen
         referrerPolicy="no-referrer"
       />
