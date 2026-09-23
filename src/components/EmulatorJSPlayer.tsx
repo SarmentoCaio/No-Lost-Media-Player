@@ -50,10 +50,19 @@ interface PendingRequest {
 
 function playableRomUrl(romUrl: string): string {
   try {
-    const url = new URL(romUrl);
+    let clean = romUrl.trim();
+    while (clean.includes("%25")) {
+      try { clean = decodeURIComponent(clean); } catch { break; }
+    }
+    const url = new URL(clean);
     if (url.protocol === "https:"
       && (url.hostname === "archive.org" || url.hostname.endsWith(".archive.org"))) {
-      return `/api/rom?url=${encodeURIComponent(url.toString())}`;
+      url.pathname = url.pathname
+        .split("/")
+        .map((seg) => encodeURIComponent(decodeURIComponent(seg)))
+        .join("/");
+      const cleanFileName = decodeURIComponent(url.pathname.split("/").filter(Boolean).pop() || "rom.zip");
+      return `/api/rom?v=5&url=${encodeURIComponent(url.toString())}#/${encodeURIComponent(cleanFileName)}`;
     }
   } catch {
     // URLs blob: e caminhos relativos continuam sendo enviados sem alteração.

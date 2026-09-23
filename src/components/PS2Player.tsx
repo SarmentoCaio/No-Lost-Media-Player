@@ -48,10 +48,18 @@ const analogControls: Readonly<Record<number, { control: Ps2InputControl; direct
 
 function playableRomUrl(romUrl: string): string {
   try {
-    const url = new URL(romUrl);
+    let clean = romUrl.trim();
+    while (clean.includes("%25")) {
+      try { clean = decodeURIComponent(clean); } catch { break; }
+    }
+    const url = new URL(clean);
     if (url.protocol === "https:"
       && (url.hostname === "archive.org" || url.hostname.endsWith(".archive.org"))) {
-      return `/api/rom?url=${encodeURIComponent(url.toString())}`;
+      url.pathname = url.pathname
+        .split("/")
+        .map((seg) => encodeURIComponent(decodeURIComponent(seg)))
+        .join("/");
+      return `/api/rom?v=5&url=${encodeURIComponent(url.toString())}`;
     }
   } catch {
     // Caminhos relativos e URLs blob permanecem inalterados.

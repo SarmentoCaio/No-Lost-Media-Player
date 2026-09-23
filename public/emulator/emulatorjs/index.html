@@ -42,7 +42,7 @@
 
         const params = new URLSearchParams(window.location.search);
         let core = params.get("core");
-        const rom = params.get("rom");
+        let rom = params.get("rom");
         const name = params.get("name") || "Jogo";
         const gameId = Number(params.get("gameId"));
         const netplayServer = params.get("netplayServer");
@@ -203,18 +203,27 @@
           let cleanFileName = "rom.zip";
           try {
             const parsed = new URL(cleanRom);
+            parsed.pathname = parsed.pathname
+              .split("/")
+              .map((seg) => encodeURIComponent(decodeURIComponent(seg)))
+              .join("/");
+            cleanRom = parsed.toString();
             const last = parsed.pathname.split("/").filter(Boolean).pop();
             if (last) cleanFileName = decodeURIComponent(last);
           } catch {
             // fallback
           }
-          rom = `/api/rom?v=3&url=${encodeURIComponent(cleanRom)}#/${encodeURIComponent(cleanFileName)}`;
+          rom = `/api/rom?v=5&url=${encodeURIComponent(cleanRom)}#/${encodeURIComponent(cleanFileName)}`;
         } else if ((rom.includes("/api/rom") || rom.includes("/api/proxy")) && !rom.includes("#/")) {
           try {
             const parsed = new URL(rom, window.location.origin);
             const targetUrl = parsed.searchParams.get("url");
             if (targetUrl) {
-              const targetParsed = new URL(targetUrl);
+              let cleanTarget = targetUrl;
+              while (cleanTarget.includes("%25")) {
+                try { cleanTarget = decodeURIComponent(cleanTarget); } catch { break; }
+              }
+              const targetParsed = new URL(cleanTarget);
               const last = targetParsed.pathname.split("/").filter(Boolean).pop();
               if (last) {
                 rom = `${rom}#/${encodeURIComponent(decodeURIComponent(last))}`;

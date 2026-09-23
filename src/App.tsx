@@ -16,8 +16,11 @@ function launchFromLocation(): PlayerLaunch | null {
   if (state?.launch?.platform === match[1]) return state.launch;
 
   const params = new URLSearchParams(window.location.search);
-  const romUrl = params.get("rom");
+  let romUrl = params.get("rom");
   if (!romUrl) return null;
+  while (romUrl.includes("%25")) {
+    try { romUrl = decodeURIComponent(romUrl); } catch { break; }
+  }
   return {
     gameId: params.get("id") ?? "jogo",
     title: params.get("name") ?? "Jogo",
