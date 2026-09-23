@@ -119,7 +119,11 @@
 
         // Se a ROM for do Archive.org e ainda não foi roteada pelo proxy, converte automaticamente
         if (/^https?:\/\/(?:[a-z0-9-]+\.)*archive\.org\//i.test(rom)) {
-          rom = `/api/proxy?url=${encodeURIComponent(rom)}`;
+          let cleanRom = rom;
+          while (cleanRom.includes("%25")) {
+            try { cleanRom = decodeURIComponent(cleanRom); } catch { break; }
+          }
+          rom = `/api/proxy?url=${encodeURIComponent(cleanRom)}&v=2`;
         }
 
         if (/^https?:/i.test(rom)) {

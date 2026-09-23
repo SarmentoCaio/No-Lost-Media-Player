@@ -1,104 +1,143 @@
-export const config = {
-  runtime: 'edge',
-};
+import type { IncomingMessage, ServerResponse } from "node:http";
+import { Readable } from "node:stream";
 
-export default async function handler(req: Request) {
-  if (req.method === 'OPTIONS') {
-    return new Response(null, {
-      status: 204,
-      headers: {
-        'Access-Control-Allow-Origin': '*',
-        'Access-Control-Allow-Methods': 'GET, HEAD, OPTIONS',
-        'Access-Control-Allow-Headers': 'Range, Content-Type, Accept',
-        'Access-Control-Max-Age': '86400',
-      },
-    });
+export const maxDuration = 60;
+
+export default async function handler(req: IncomingMessage, res: ServerResponse) {
+  if (req.method === "OPTIONS") {
+    res.statusCode = 204;
+    res.setHeader("Access-Control-Allow-Origin", "*");
+    res.setHeader("Access-Control-Allow-Methods", "GET, HEAD, OPTIONS");
+    res.setHeader("Access-Control-Allow-Headers", "Range, Content-Type, Accept");
+    res.setHeader("Access-Control-Max-Age", "86400");
+    return res.end();
   }
 
-  const { searchParams } = new URL(req.url);
-  const targetUrl = searchParams.get('url');
+  const host = req.headers.host || "localhost";
+  const urlObj = new URL(req.url || "", `https://${host}`);
+  let targetUrl = urlObj.searchParams.get("url");
 
   if (!targetUrl) {
-    return new Response(JSON.stringify({ error: 'Parâmetro url é obrigatório.' }), {
-      status: 400,
-      headers: {
-        'Content-Type': 'application/json',
-        'Access-Control-Allow-Origin': '*',
-      },
-    });
+    res.statusCode = 400;
+    res.setHeader("Content-Type", "application/json");
+    res.setHeader("Access-Control-Allow-Origin", "*");
+    res.setHeader("Cache-Control", "no-cache, no-store, must-revalidate");
+    return res.end(JSON.stringify({ error: "Parâmetro url é obrigatório." }));
+  }
+
+  // Normaliza e desfaz eventual dupla codificação de URLs
+  while (targetUrl.includes("%25")) {
+    try {
+      targetUrl = decodeURIComponent(targetUrl);
+    } catch {
+      break;
+    }
   }
 
   let parsedUrl: URL;
   try {
     parsedUrl = new URL(targetUrl);
-    if (parsedUrl.protocol !== 'http:' && parsedUrl.protocol !== 'https:') {
-      throw new Error('Protocolo inválido');
+    if (parsedUrl.protocol !== "http:" && parsedUrl.protocol !== "https:") {
+      throw new Error("Protocolo inválido");
     }
   } catch {
-    return new Response(JSON.stringify({ error: 'URL informada é inválida.' }), {
-      status: 400,
-      headers: {
-        'Content-Type': 'application/json',
-        'Access-Control-Allow-Origin': '*',
-      },
-    });
+    res.statusCode = 400;
+    res.setHeader("Content-Type", "application/json");
+    res.setHeader("Access-Control-Allow-Origin", "*");
+    res.setHeader("Cache-Control", "no-cache, no-store, must-revalidate");
+    return res.end(JSON.stringify({ error: "URL informada é inválida." }));
   }
 
-  const forwardHeaders: Record<string, string> = {
-    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-    'Accept': req.headers.get('accept') || '*/*',
-  };
+  const clientRange = req.headers["range"];
 
-  const rangeHeader = req.headers.get('range');
-  if (rangeHeader) {
-    forwardHeaders['Range'] = rangeHeader;
-  }
+  // Gerenciamento manual de redirecionamentos contra instabilidade de nós do Archive.org
+  let currentUrl = parsedUrl.href;
+  let redirects = 0;
+  const maxRedirects = 6;
+  let upstreamResponse: Response | null = null;
 
-  try {
-    const upstreamResponse = await fetch(parsedUrl.href, {
-      method: req.method,
-      headers: forwardHeaders,
-      redirect: 'follow',
-    });
-
-    const responseHeaders = new Headers();
-    responseHeaders.set('Access-Control-Allow-Origin', '*');
-    responseHeaders.set('Access-Control-Allow-Methods', 'GET, HEAD, OPTIONS');
-    responseHeaders.set('Access-Control-Allow-Headers', 'Range, Content-Type, Accept');
-    responseHeaders.set('Access-Control-Expose-Headers', 'Content-Length, Content-Range, Accept-Ranges, Content-Disposition');
-    responseHeaders.set('Cross-Origin-Resource-Policy', 'cross-origin');
-    responseHeaders.set('Cache-Control', 'public, max-age=2592000, immutable');
-
-    const contentType = upstreamResponse.headers.get('content-type');
-    if (contentType) responseHeaders.set('Content-Type', contentType);
-
-    const contentLength = upstreamResponse.headers.get('content-length');
-    if (contentLength) responseHeaders.set('Content-Length', contentLength);
-
-    const contentRange = upstreamResponse.headers.get('content-range');
-    if (contentRange) responseHeaders.set('Content-Range', contentRange);
-
-    const acceptRanges = upstreamResponse.headers.get('accept-ranges');
-    responseHeaders.set('Accept-Ranges', acceptRanges || 'bytes');
-
-    if (req.method === 'HEAD') {
-      return new Response(null, {
-        status: upstreamResponse.status,
-        headers: responseHeaders,
-      });
+  while (redirects < maxRedirects) {
+    const forwardHeaders: Record<string, string> = {
+      "User-Agent":
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+      Accept: typeof req.headers.accept === "string" ? req.headers.accept : "*/*",
+    };
+    if (clientRange) {
+      forwardHeaders["Range"] = String(clientRange);
     }
 
-    return new Response(upstreamResponse.body, {
-      status: upstreamResponse.status,
-      headers: responseHeaders,
+    try {
+      const resp = await fetch(currentUrl, {
+        method: req.method === "HEAD" ? "HEAD" : "GET",
+        headers: forwardHeaders,
+        redirect: "manual",
+      });
+
+      if (resp.status >= 300 && resp.status < 400) {
+        const location = resp.headers.get("location");
+        if (!location) {
+          break;
+        }
+        currentUrl = new URL(location, currentUrl).href;
+        redirects++;
+        continue;
+      }
+
+      upstreamResponse = resp;
+      break;
+    } catch (err: any) {
+      break;
+    }
+  }
+
+  if (!upstreamResponse) {
+    res.statusCode = 502;
+    res.setHeader("Content-Type", "application/json");
+    res.setHeader("Access-Control-Allow-Origin", "*");
+    res.setHeader("Cache-Control", "no-cache, no-store, must-revalidate");
+    return res.end(JSON.stringify({ error: "Falha ao contatar acervo remoto." }));
+  }
+
+  res.statusCode = upstreamResponse.status;
+  res.setHeader("Access-Control-Allow-Origin", "*");
+  res.setHeader("Access-Control-Allow-Methods", "GET, HEAD, OPTIONS");
+  res.setHeader("Access-Control-Allow-Headers", "Range, Content-Type, Accept");
+  res.setHeader(
+    "Access-Control-Expose-Headers",
+    "Content-Length, Content-Range, Accept-Ranges, Content-Disposition"
+  );
+  res.setHeader("Cross-Origin-Resource-Policy", "cross-origin");
+
+  // Nunca cacheia respostas de erro no CDN da Vercel
+  if (upstreamResponse.status >= 200 && upstreamResponse.status < 300) {
+    res.setHeader("Cache-Control", "public, max-age=2592000, immutable");
+  } else {
+    res.setHeader("Cache-Control", "no-cache, no-store, must-revalidate");
+  }
+
+  const contentType = upstreamResponse.headers.get("content-type");
+  if (contentType) res.setHeader("Content-Type", contentType);
+
+  const contentLength = upstreamResponse.headers.get("content-length");
+  if (contentLength) res.setHeader("Content-Length", contentLength);
+
+  const contentRange = upstreamResponse.headers.get("content-range");
+  if (contentRange) res.setHeader("Content-Range", contentRange);
+
+  const acceptRanges = upstreamResponse.headers.get("accept-ranges");
+  res.setHeader("Accept-Ranges", acceptRanges || "bytes");
+
+  if (req.method === "HEAD") {
+    return res.end();
+  }
+
+  if (upstreamResponse.body) {
+    const nodeStream = Readable.fromWeb(upstreamResponse.body as any);
+    nodeStream.pipe(res);
+    req.on("close", () => {
+      nodeStream.destroy();
     });
-  } catch (error: any) {
-    return new Response(JSON.stringify({ error: 'Falha ao contatar servidor de origem.', details: error.message }), {
-      status: 502,
-      headers: {
-        'Content-Type': 'application/json',
-        'Access-Control-Allow-Origin': '*',
-      },
-    });
+  } else {
+    res.end();
   }
 }

@@ -87,7 +87,7 @@ export function isArchiveOrgUrl(url: string): boolean {
 }
 
 export function resolvePlayableRomUrl(url: string): string {
-  const trimmed = url.trim();
+  let trimmed = url.trim();
   if (!trimmed) return trimmed;
   if (trimmed.startsWith("blob:") || trimmed.startsWith("data:")) {
     return trimmed;
@@ -95,8 +95,15 @@ export function resolvePlayableRomUrl(url: string): string {
   if (isProxiedRomUrl(trimmed)) {
     return trimmed;
   }
+  while (trimmed.includes("%25")) {
+    try {
+      trimmed = decodeURIComponent(trimmed);
+    } catch {
+      break;
+    }
+  }
   if (isArchiveOrgUrl(trimmed)) {
-    return `/api/proxy?url=${encodeURIComponent(trimmed)}`;
+    return `/api/proxy?url=${encodeURIComponent(trimmed)}&v=2`;
   }
   return trimmed;
 }
