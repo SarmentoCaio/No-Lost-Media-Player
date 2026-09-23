@@ -194,7 +194,8 @@
           return;
         }
 
-        // Se a ROM for do Archive.org e ainda não foi roteada pelo proxy, converte automaticamente
+        // Se a ROM for do Archive.org, garante o uso do endpoint oficial de CORS (/cors/)
+        // que fornece cabeçalhos ACAO nativos e download direto pelo browser em alta velocidade.
         if (/^https?:\/\/(?:[a-z0-9-]+\.)*archive\.org\//i.test(rom)) {
           let cleanRom = rom;
           while (cleanRom.includes("%25")) {
@@ -207,27 +208,36 @@
               .split("/")
               .map((seg) => encodeURIComponent(decodeURIComponent(seg)))
               .join("/");
+            if (parsed.pathname.startsWith("/download/")) {
+              parsed.pathname = parsed.pathname.replace(/^\/download\//, "/cors/");
+            }
             cleanRom = parsed.toString();
             const last = parsed.pathname.split("/").filter(Boolean).pop();
             if (last) cleanFileName = decodeURIComponent(last);
           } catch {
             // fallback
           }
-          rom = `/api/rom?v=5&url=${encodeURIComponent(cleanRom)}#/${encodeURIComponent(cleanFileName)}`;
-        } else if ((rom.includes("/api/rom") || rom.includes("/api/proxy")) && !rom.includes("#/")) {
+          rom = `${cleanRom}#/${encodeURIComponent(cleanFileName)}`;
+        } else if (rom.includes("/api/rom") || rom.includes("/api/proxy")) {
           try {
             const parsed = new URL(rom, window.location.origin);
             const targetUrl = parsed.searchParams.get("url");
-            if (targetUrl) {
+            if (targetUrl && /^https?:\/\/(?:[a-z0-9-]+\.)*archive\.org\//i.test(targetUrl)) {
               let cleanTarget = targetUrl;
               while (cleanTarget.includes("%25")) {
                 try { cleanTarget = decodeURIComponent(cleanTarget); } catch { break; }
               }
               const targetParsed = new URL(cleanTarget);
-              const last = targetParsed.pathname.split("/").filter(Boolean).pop();
-              if (last) {
-                rom = `${rom}#/${encodeURIComponent(decodeURIComponent(last))}`;
+              targetParsed.pathname = targetParsed.pathname
+                .split("/")
+                .map((seg) => encodeURIComponent(decodeURIComponent(seg)))
+                .join("/");
+              if (targetParsed.pathname.startsWith("/download/")) {
+                targetParsed.pathname = targetParsed.pathname.replace(/^\/download\//, "/cors/");
               }
+              const last = targetParsed.pathname.split("/").filter(Boolean).pop();
+              const cleanFileName = last ? decodeURIComponent(last) : "rom.zip";
+              rom = `${targetParsed.toString()}#/${encodeURIComponent(cleanFileName)}`;
             }
           } catch {
             // fallback

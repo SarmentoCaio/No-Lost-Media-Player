@@ -61,8 +61,11 @@ function playableRomUrl(romUrl: string): string {
         .split("/")
         .map((seg) => encodeURIComponent(decodeURIComponent(seg)))
         .join("/");
+      if (url.pathname.startsWith("/download/")) {
+        url.pathname = url.pathname.replace(/^\/download\//, "/cors/");
+      }
       const cleanFileName = decodeURIComponent(url.pathname.split("/").filter(Boolean).pop() || "rom.zip");
-      return `/api/rom?v=5&url=${encodeURIComponent(url.toString())}#/${encodeURIComponent(cleanFileName)}`;
+      return `${url.toString()}#/${encodeURIComponent(cleanFileName)}`;
     }
   } catch {
     // URLs blob: e caminhos relativos continuam sendo enviados sem alteração.
