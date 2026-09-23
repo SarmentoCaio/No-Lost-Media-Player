@@ -4,12 +4,21 @@ interface DPadProps {
   active: Readonly<Record<string, number>>;
   actionIds?: { up: string; down: string; left: string; right: string };
   onInput?: (action: string, value: number, source: string) => void;
+  onSelectAction?: (action: string) => void;
+  listeningAction?: string | null;
   disabled?: boolean;
 }
 
 const defaults = { up: "up", down: "down", left: "left", right: "right" };
 
-export function DPad({ active, actionIds = defaults, onInput, disabled }: DPadProps) {
+export function DPad({
+  active,
+  actionIds = defaults,
+  onInput,
+  onSelectAction,
+  listeningAction,
+  disabled,
+}: DPadProps) {
   const pointerRef = useRef<number | null>(null);
   const pressedRef = useRef(new Set<string>());
 
@@ -33,6 +42,28 @@ export function DPad({ active, actionIds = defaults, onInput, disabled }: DPadPr
     pointerRef.current = null;
   };
 
+  const key = (
+    direction: keyof typeof actionIds,
+    symbol: string,
+    label: string,
+  ) => {
+    const action = actionIds[direction];
+    return (
+      <button
+        type="button"
+        className={`dpad__key dpad__key--${direction}${active[action] ? " is-active" : ""}${listeningAction === action ? " is-listening" : ""}${onSelectAction ? " is-mappable" : ""}`}
+        onClick={onSelectAction ? (event) => {
+          event.stopPropagation();
+          onSelectAction(action);
+        } : undefined}
+        tabIndex={onSelectAction ? 0 : -1}
+        aria-label={onSelectAction ? `Mapear ${label}` : label}
+      >
+        {symbol}
+      </button>
+    );
+  };
+
   return (
     <div
       className="dpad"
@@ -47,13 +78,13 @@ export function DPad({ active, actionIds = defaults, onInput, disabled }: DPadPr
       }}
       onPointerUp={(event) => { if (event.pointerId === pointerRef.current) release(`touch:dpad:${event.pointerId}`); }}
       onPointerCancel={(event) => { if (event.pointerId === pointerRef.current) release(`touch:dpad:${event.pointerId}`); }}
-      role={onInput ? "group" : "img"}
+      role="group"
       aria-label="Direcional"
     >
-      <span className={`dpad__key dpad__key--up${active[actionIds.up] ? " is-active" : ""}`}>▲</span>
-      <span className={`dpad__key dpad__key--right${active[actionIds.right] ? " is-active" : ""}`}>▶</span>
-      <span className={`dpad__key dpad__key--down${active[actionIds.down] ? " is-active" : ""}`}>▼</span>
-      <span className={`dpad__key dpad__key--left${active[actionIds.left] ? " is-active" : ""}`}>◀</span>
+      {key("up", "▲", "direcional para cima")}
+      {key("right", "▶", "direcional para a direita")}
+      {key("down", "▼", "direcional para baixo")}
+      {key("left", "◀", "direcional para a esquerda")}
       <span className="dpad__center" />
     </div>
   );

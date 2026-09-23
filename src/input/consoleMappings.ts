@@ -87,7 +87,7 @@ export const consoleMappings: Record<PlayablePlatform, ConsoleControlConfig> = {
     ],
     controls: [
       ...directions,
-      control("triangle", "Triângulo", "△", 9, "KeyS", button(3), 83, 37),
+      control("triangle", "Triângulo", "△", 9, "KeyV", button(3), 83, 37),
       control("circle", "Círculo", "○", 8, "KeyC", button(1), 90, 48),
       control("cross", "Cruz", "×", 0, "KeyX", button(0), 83, 59),
       control("square", "Quadrado", "□", 1, "KeyZ", button(2), 76, 48),
@@ -97,6 +97,38 @@ export const consoleMappings: Record<PlayablePlatform, ConsoleControlConfig> = {
       control("r2", "R2", "R2", 13, "Digit3", button(7), 78, 7),
       control("select", "Select", "SELECT", 2, "ShiftRight", button(8), 44, 46),
       control("start", "Start", "START", 3, "Enter", button(9), 57, 46),
+      control("l3", "L3", "L3", 14, "KeyF", button(10), 42, 67),
+      control("r3", "R3", "R3", 15, "KeyH", button(11), 59, 67),
+      control("left-stick-up", "Analógico E cima", "↑", 19, "KeyW", axis(1, -1), 42, 62, "analog"),
+      control("left-stick-down", "Analógico E baixo", "↓", 18, "KeyS", axis(1, 1), 42, 72, "analog"),
+      control("left-stick-left", "Analógico E esquerda", "←", 17, "KeyA", axis(0, -1), 38, 67, "analog"),
+      control("left-stick-right", "Analógico E direita", "→", 16, "KeyD", axis(0, 1), 46, 67, "analog"),
+      control("right-stick-up", "Analógico D cima", "↑", 23, "KeyI", axis(3, -1), 59, 62, "analog"),
+      control("right-stick-down", "Analógico D baixo", "↓", 22, "KeyK", axis(3, 1), 59, 72, "analog"),
+      control("right-stick-left", "Analógico D esquerda", "←", 21, "KeyJ", axis(2, -1), 55, 67, "analog"),
+      control("right-stick-right", "Analógico D direita", "→", 20, "KeyL", axis(2, 1), 63, 67, "analog"),
+    ],
+  },
+  ps2: {
+    platform: "ps2", name: "PlayStation 2", shape: "dual-grip",
+    analogs: [
+      { id: "left-stick", label: "Analógico esquerdo", up: "left-stick-up", down: "left-stick-down", left: "left-stick-left", right: "left-stick-right", visual: { x: 42, y: 67 } },
+      { id: "right-stick", label: "Analógico direito", up: "right-stick-up", down: "right-stick-down", left: "right-stick-left", right: "right-stick-right", visual: { x: 59, y: 67 } },
+    ],
+    controls: [
+      ...directions,
+      control("triangle", "Triângulo", "△", 9, "KeyV", button(3), 83, 37),
+      control("circle", "Círculo", "○", 8, "KeyC", button(1), 90, 48),
+      control("cross", "Cruz", "×", 0, "KeyX", button(0), 83, 59),
+      control("square", "Quadrado", "□", 1, "KeyZ", button(2), 76, 48),
+      control("l1", "L1", "L1", 10, "KeyQ", button(4), 22, 13),
+      control("l2", "L2", "L2", 12, "Digit1", button(6), 22, 7),
+      control("r1", "R1", "R1", 11, "KeyE", button(5), 78, 13),
+      control("r2", "R2", "R2", 13, "Digit3", button(7), 78, 7),
+      control("select", "Select", "SELECT", 2, "ShiftRight", button(8), 44, 46),
+      control("start", "Start", "START", 3, "Enter", button(9), 57, 46),
+      control("l3", "L3", "L3", 14, "KeyF", button(10), 42, 67),
+      control("r3", "R3", "R3", 15, "KeyH", button(11), 59, 67),
       control("left-stick-up", "Analógico E cima", "↑", 19, "KeyW", axis(1, -1), 42, 62, "analog"),
       control("left-stick-down", "Analógico E baixo", "↓", 18, "KeyS", axis(1, 1), 42, 72, "analog"),
       control("left-stick-left", "Analógico E esquerda", "←", 17, "KeyA", axis(0, -1), 38, 67, "analog"),
@@ -125,6 +157,10 @@ export function defaultMobileSettings(platform: PlayablePlatform): Record<string
   }
   const buttons = config.controls.filter((item) => item.kind === "button");
   buttons.forEach((item) => {
+    if (["l3", "r3"].includes(item.id)) {
+      result[item.id] = { x: item.visual.x, y: item.visual.y, size: 0.75, opacity: 0.72, visible: false };
+      return;
+    }
     let x = item.visual.x;
     let y = item.visual.y;
     if (["start", "select"].includes(item.id)) y = 88;

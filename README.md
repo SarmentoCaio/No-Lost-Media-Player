@@ -42,7 +42,7 @@ Para PS1, prefira `.chd` ou `.pbp`. Imagens `.bin/.cue` dependem de mais de um a
 2. Cole uma URL HTTPS direta para o arquivo, por exemplo `https://servidor.exemplo/jogo.sfc`.
 3. Clique em **Iniciar jogo**.
 
-A URL precisa apontar diretamente para a ROM e o servidor remoto precisa autorizar CORS para a origem da aplicação. Páginas de download, links que exigem cookies e URLs expiradas não funcionam.
+A URL precisa apontar diretamente para a ROM. Links HTTPS do Archive.org passam pelo proxy restrito da aplicação; outros servidores remotos precisam autorizar CORS para a origem da aplicação. Páginas de download, links que exigem cookies e URLs expiradas não funcionam.
 
 ## Primeiro teste com SNES
 
@@ -58,7 +58,7 @@ A URL precisa apontar diretamente para a ROM e o servidor remoto precisa autoriz
 
 Antes de inicializar uma ROM remota, o iframe faz uma requisição curta de verificação. Se o servidor não enviar um cabeçalho `Access-Control-Allow-Origin` compatível, a aplicação informa: “O servidor da ROM não permite carregamento por outro domínio.”
 
-O projeto não inclui nem cria um proxy, não tenta contornar CORS e não baixa ROMs para o servidor. Outros erros amigáveis cobrem URL inexistente, falha de conexão, runtime indisponível e formato incompatível. Alguns bloqueadores de conteúdo podem impedir o acesso a `cdn.emulatorjs.org`.
+Para links diretos do Archive.org, o projeto usa `/api/rom`, um proxy de streaming limitado exclusivamente a domínios HTTPS `archive.org`. No desenvolvimento ele é servido pelo Vite e, na Vercel, por uma Edge Function. Outros erros amigáveis cobrem URL inexistente, falha de conexão, runtime indisponível e formato incompatível. Alguns bloqueadores de conteúdo podem impedir o acesso a `cdn.emulatorjs.org`.
 
 ## Arquitetura
 
@@ -71,15 +71,16 @@ GamePlayer
 │   ├── N64: mupen64plus_next / parallel_n64
 │   └── PS1: pcsx_rearmed
 └── PS2Player
-    └── Play! WebAssembly (futuro)
+    └── Play! WebAssembly (beta)
 ```
 
 - `src/components`: seleção, player, barra e adaptadores visuais.
-- `src/emulators`: configuração central das plataformas e cores.
+- `src/emulators`: configuração central das plataformas, ponte Play! e leitura de imagens PS2 por blocos.
 - `src/pages`: tela inicial e tela `/play/:platform`.
 - `src/storage/saveStorage.ts`: abstração IndexedDB pronta para dados de save, sem armazenar ROMs.
 - `public/emulator/emulatorjs/index.html`: host isolado que configura e carrega o EmulatorJS.
-- `public/emulator/ps2`: local reservado ao runtime Play! WebAssembly.
+- `emulator/ps2/index.html`: host isolado do Play! WebAssembly.
+- `scripts/install-play-runtime.mjs`: instala e valida por SHA-256 a versão fixada do runtime Play!.
 
 O contrato principal não conhece a hospedagem da ROM:
 
@@ -91,15 +92,17 @@ O player usa os cores Libretro distribuídos pelo EmulatorJS. NES, SNES, GBA, N6
 
 O PS1 usa `pcsx_rearmed` com a BIOS HLE explicitamente selecionada e não exige que o site distribua o arquivo protegido `scph5500.bin`. No N64, a barra do player permite alternar entre Mupen64Plus e ParaLLEl. O segundo é uma opção de compatibilidade para jogos, GPUs ou drivers que exibem tela preta no Mupen64Plus. Quando WebGL 2 não existe, a troca para ParaLLEl é automática.
 
+O PS2 usa o Play! WebAssembly em beta. Arquivos locais são entregues diretamente ao runtime, sem upload; URLs remotas precisam oferecer HTTP Range. Links diretos do Archive.org usam o proxy de streaming do projeto. O PS2 já compartilha os controles configuráveis, gamepad, touch, volume, pausa e tela cheia das demais plataformas. A versão atual do Play! ainda não expõe save states, aceleração ou netplay, então essas ações ficam ocultas no PS2.
+
 ## Salvamentos
 
-Os botões **Salvar** e **Carregar** usam uma ponte de mensagens com o iframe do EmulatorJS. Sem configuração, os arquivos `.state` são gravados automaticamente em `No Lost Media Player/Saves` no armazenamento privado do navegador (OPFS), que no Chrome e Edge fica dentro do perfil local do navegador, normalmente sob AppData. Isso não exige uma permissão a cada jogo.
+Nos consoles atendidos pelo EmulatorJS, os botões **Salvar** e **Carregar** usam uma ponte de mensagens com o iframe. Sem configuração, os arquivos `.state` são gravados automaticamente em `No Lost Media Player/Saves` no armazenamento privado do navegador (OPFS), que no Chrome e Edge fica dentro do perfil local do navegador, normalmente sob AppData. Isso não exige uma permissão a cada jogo. O Play! usado no PS2 ainda não expõe save states.
 
 O botão **Pasta de saves** permite substituir o padrão por uma pasta visível escolhida pelo usuário. Essa seleção usa a File System Access API, disponível no Chrome e Edge em HTTPS (e também em `localhost`), e fica registrada no IndexedDB. **Usar padrão** volta ao armazenamento privado. As ROMs continuam sem ser persistidas ou enviadas pelo player.
 
 ## Controles e reinicialização
 
-O botão **Controles** abre o mapeamento do EmulatorJS. O host do iframe captura a tecla durante o popup de remapeamento, mesmo quando o navegador move o foco para fora do contêiner do emulador, e o EmulatorJS persiste a escolha para o jogo. O botão **Reiniciar** encerra a instância atual e cria outra com a mesma ROM, mantendo controles e saves.
+O botão **Controles** abre o painel unificado do player, com teclado, gamepad, layout touch e atalhos globais. Cada console mantém seu próprio mapeamento; volume e atalhos do player são compartilhados. O host do iframe encaminha as teclas mesmo quando o foco está dentro do emulador. O botão **Reiniciar** encerra a instância atual e cria outra com a mesma ROM, mantendo as configurações.
 
 O emulador pausa automaticamente quando sua aba fica em segundo plano. Ao voltar, fechar ou navegar para fora do player, a página envia um comando explícito de encerramento ao runtime, interrompe o áudio e finaliza o loop de emulação.
 
@@ -119,7 +122,7 @@ O player usa esse endereço por padrão. Para usar outro servidor, defina `VITE_
 
 ## Plataformas ainda não ativadas
 
-O catálogo também possui Dreamcast, GameCube, Wii, PS2 e PS3. Eles não foram ativados nesta etapa porque não existem cores compatíveis no runtime usado ou exigem runtimes WebAssembly próprios, BIOS, isolamento por cabeçalhos e arquivos de vários gigabytes. `PS2Player` permanece separado para uma futura integração oficial do Play!; Dreamcast e os consoles baseados em Dolphin/RPCS3 também devem receber adaptadores próprios em vez de uma implementação improvisada.
+Dreamcast, GameCube, Wii e PS3 ainda não foram ativados porque exigem runtimes WebAssembly próprios, requisitos adicionais de BIOS/firmware e arquivos de vários gigabytes. Esses consoles devem receber adaptadores dedicados, como o PS2 recebeu com o Play!, em vez de uma implementação improvisada.
 
 ## Integração com No Lost Media
 
@@ -134,4 +137,4 @@ O catálogo monta o contrato de lançamento a partir de um objeto `Game`:
 }
 ```
 
-Como URL, título e plataforma entram por propriedades, nenhuma alteração no componente de emulação será necessária. Autorização, disponibilidade e CORS continuarão sendo responsabilidade da camada de catálogo/armazenamento.
+Como URL, título e plataforma entram por propriedades, nenhuma alteração no componente de emulação será necessária. Para PS2, o armazenamento deve aceitar requisições HTTP Range e CORS; `VITE_PS2_ROM_ORIGINS` pode restringir as origens permitidas, enquanto `*` ou a ausência da variável aceita qualquer origem HTTPS. URLs do Archive.org são atendidas pelo proxy existente. Autorização e disponibilidade continuam sendo responsabilidade da camada de catálogo/armazenamento.

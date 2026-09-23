@@ -2,6 +2,7 @@ import { forwardRef, useEffect, useImperativeHandle, useMemo, useRef, useState }
 import { emulatorConfig } from "../emulators/emulatorConfig";
 import type { Platform } from "../types/game";
 import type { RawKeyboardInput } from "../input/controlTypes";
+import { ConsoleLoadingIndicator } from "./ConsoleLoadingIndicator";
 
 interface EmulatorJSPlayerProps {
   platform: Exclude<Platform, "ps2">;
@@ -25,6 +26,7 @@ interface EmulatorMessage {
   code?: unknown;
   pressed?: unknown;
   repeat?: unknown;
+  progress?: unknown;
 }
 
 export interface EmulatorJSPlayerHandle {
@@ -36,6 +38,8 @@ export interface EmulatorJSPlayerHandle {
   setInput: (coreIndex: number, value: number) => void;
   releaseAllInputs: () => void;
   configureInput: (codes: string[]) => void;
+  setFastForward: (active: boolean) => void;
+  setPaused: (paused: boolean) => void;
 }
 
 interface PendingRequest {
@@ -44,14 +48,31 @@ interface PendingRequest {
   timeout: number;
 }
 
+function playableRomUrl(romUrl: string): string {
+  try {
+    const url = new URL(romUrl);
+    if (url.protocol === "https:"
+      && (url.hostname === "archive.org" || url.hostname.endsWith(".archive.org"))) {
+      return `/api/rom?url=${encodeURIComponent(url.toString())}`;
+    }
+  } catch {
+    // URLs blob: e caminhos relativos continuam sendo enviados sem alteração.
+  }
+  return romUrl;
+}
+
 export const EmulatorJSPlayer = forwardRef<EmulatorJSPlayerHandle, EmulatorJSPlayerProps>(function EmulatorJSPlayer(
   { platform, romUrl, gameName, gameId, core, volume, keyboardCodes, onKeyboardInput, onError, onReady },
   ref,
 ) {
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const pendingRequests = useRef(new Map<string, PendingRequest>());
+  const finishTimerRef = useRef<number | null>(null);
+  const startupTimerRef = useRef<number | null>(null);
   const [status, setStatus] = useState("Preparando emulador…");
   const [loading, setLoading] = useState(true);
+  const [progress, setProgress] = useState(2);
+  const progressTargetRef = useRef(4);
   const netplayServer = import.meta.env.VITE_NETPLAY_SERVER_URL?.trim()
     || "https://no-lost-media-netplay-sarmentocaio.onrender.com";
 
@@ -68,7 +89,7 @@ export const EmulatorJSPlayer = forwardRef<EmulatorJSPlayerHandle, EmulatorJSPla
   const emulatorUrl = useMemo(() => {
     const parameters = new URLSearchParams({
       core: core ?? emulatorConfig[platform].core,
-      rom: romUrl,
+      rom: playableRomUrl(romUrl),
       name: gameName,
       gameId: String(numericGameId),
       netplayServer,
@@ -126,12 +147,22 @@ export const EmulatorJSPlayer = forwardRef<EmulatorJSPlayerHandle, EmulatorJSPla
     setInput: (coreIndex, value) => post({ type: "input", coreIndex, value }),
     releaseAllInputs: () => post({ type: "release-all-inputs" }),
     configureInput: (codes) => post({ type: "configure-input", codes }),
+    setFastForward: (active) => post({ type: "set-fast-forward", active }),
+    setPaused: (paused) => post({ type: "set-paused", paused }),
   }), [emulatorUrl]);
 
   useEffect(() => {
     setLoading(true);
+    setProgress(2);
+    progressTargetRef.current = 4;
     setStatus("Preparando emulador…");
     onReady?.(false);
+    if (finishTimerRef.current !== null) window.clearTimeout(finishTimerRef.current);
+    if (startupTimerRef.current !== null) window.clearTimeout(startupTimerRef.current);
+    startupTimerRef.current = window.setTimeout(() => {
+      setLoading(false);
+      onError("O jogo demorou demais para iniciar. Verifique se a URL aponta diretamente para uma ROM acessível.");
+    }, 120000);
 
     const handleMessage = (event: MessageEvent<EmulatorMessage>) => {
       if (event.source !== iframeRef.current?.contentWindow || event.origin !== window.location.origin) return;
@@ -140,10 +171,16 @@ export const EmulatorJSPlayer = forwardRef<EmulatorJSPlayerHandle, EmulatorJSPla
 
       if (data.type === "loading") {
         setStatus(typeof data.message === "string" ? data.message : "Carregando ROM…");
+        if (typeof data.progress === "number") {
+          progressTargetRef.current = Math.max(progressTargetRef.current, Math.min(94, data.progress));
+        }
       } else if (data.type === "ready") {
-        setLoading(false);
+        if (startupTimerRef.current !== null) window.clearTimeout(startupTimerRef.current);
+        setProgress(100);
+        finishTimerRef.current = window.setTimeout(() => setLoading(false), 320);
         onReady?.(true);
       } else if (data.type === "error") {
+        if (startupTimerRef.current !== null) window.clearTimeout(startupTimerRef.current);
         setLoading(false);
         onError(typeof data.message === "string" ? data.message : "Não foi possível iniciar o emulador.");
       } else if (data.type === "keyboard-input") {
@@ -193,8 +230,22 @@ export const EmulatorJSPlayer = forwardRef<EmulatorJSPlayerHandle, EmulatorJSPla
         pending.reject(new Error("O emulador foi reiniciado."));
       }
       pendingRequests.current.clear();
+      if (finishTimerRef.current !== null) window.clearTimeout(finishTimerRef.current);
+      if (startupTimerRef.current !== null) window.clearTimeout(startupTimerRef.current);
     };
   }, [emulatorUrl, onError, onKeyboardInput, onReady]);
+
+  useEffect(() => {
+    if (!loading) return;
+    const timer = window.setInterval(() => {
+      setProgress((current) => {
+        const target = progressTargetRef.current;
+        if (current >= target) return current;
+        return Math.min(target, current + Math.max(1, Math.ceil((target - current) * 0.08)));
+      });
+    }, 180);
+    return () => window.clearInterval(timer);
+  }, [loading]);
 
   useEffect(() => {
     post({ type: "set-volume", volume });
@@ -208,8 +259,11 @@ export const EmulatorJSPlayer = forwardRef<EmulatorJSPlayerHandle, EmulatorJSPla
     <div className="emulator-frame-wrap">
       {loading && (
         <div className="loading-overlay" role="status">
-          <span className="spinner" aria-hidden="true" />
-          <span>{status}</span>
+          <ConsoleLoadingIndicator platform={platform} progress={progress} />
+          <div className="loading-overlay__copy">
+            <strong>Preparando {gameName}</strong>
+            <span>{status}</span>
+          </div>
         </div>
       )}
       <iframe

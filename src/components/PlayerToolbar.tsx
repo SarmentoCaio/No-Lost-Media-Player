@@ -34,9 +34,11 @@ interface PlayerToolbarProps {
   gameId: string;
   platform: Platform;
   playerReady: boolean;
+  paused: boolean;
   n64Core?: string;
   onN64CoreChange?: (core: string) => void;
   onRestart: () => void;
+  onTogglePause: () => void;
   onError: (message: string) => void;
   gamepadName: string | null;
   audio: AudioSettings;
@@ -55,9 +57,11 @@ export function PlayerToolbar({
   gameId,
   platform,
   playerReady,
+  paused,
   n64Core,
   onN64CoreChange,
   onRestart,
+  onTogglePause,
   onError,
   gamepadName,
   audio,
@@ -251,7 +255,9 @@ export function PlayerToolbar({
           <span>{gamepadName ? `${gamepadName} conectado` : "Nenhum controle conectado"}</span>
         </div>
         <span className="save-directory-status" title={saveMessage ?? undefined}>
-          {saveMessage ?? (directory
+          {platform === "ps2"
+            ? "PS2 beta · save states e modo online ainda não disponíveis no Play!"
+            : saveMessage ?? (directory
             ? `Saves em: ${directory.name}`
             : "Saves automáticos: No Lost Media Player/Saves (armazenamento do navegador)")}
         </span>
@@ -268,15 +274,17 @@ export function PlayerToolbar({
             {N64_CORES.map((core) => <option key={core.value} value={core.value}>{core.label}</option>)}
           </select>
         )}
-        <button
-          type="button"
-          className="toolbar-button toolbar-button--online"
-          onClick={openNetplay}
-          disabled={!playerReady || busy}
-          title="Crie uma sala ou entre na sala de outro jogador"
-        >
-          Jogar online
-        </button>
+        {platform !== "ps2" && (
+          <button
+            type="button"
+            className="toolbar-button toolbar-button--online"
+            onClick={openNetplay}
+            disabled={!playerReady || busy}
+            title="Crie uma sala ou entre na sala de outro jogador"
+          >
+            Jogar online
+          </button>
+        )}
         <button
           type="button"
           className="toolbar-button"
@@ -286,19 +294,28 @@ export function PlayerToolbar({
         >
           Controles
         </button>
-        <button type="button" className="toolbar-button" onClick={chooseDirectory} disabled={busy}>
+        {platform !== "ps2" && <button type="button" className="toolbar-button" onClick={chooseDirectory} disabled={busy}>
           Pasta de saves
-        </button>
-        {directory && (
+        </button>}
+        {platform !== "ps2" && directory && (
           <button type="button" className="toolbar-button toolbar-button--quiet" onClick={useBrowserDirectory} disabled={busy}>
             Usar padrão
           </button>
         )}
-        <button type="button" className="toolbar-button" onClick={saveGame} disabled={!playerReady || busy}>
+        {platform !== "ps2" && <button type="button" className="toolbar-button" onClick={saveGame} disabled={!playerReady || busy}>
           Salvar
-        </button>
-        <button type="button" className="toolbar-button" onClick={loadGame} disabled={!playerReady || busy}>
+        </button>}
+        {platform !== "ps2" && <button type="button" className="toolbar-button" onClick={loadGame} disabled={!playerReady || busy}>
           Carregar
+        </button>}
+        <button
+          type="button"
+          className={`toolbar-button${paused ? " toolbar-button--active" : ""}`}
+          onClick={onTogglePause}
+          disabled={!playerReady || busy}
+          title={paused ? "Continuar a emulação" : "Pausar a emulação"}
+        >
+          {paused && <span aria-hidden="true">▶</span>} {paused ? "Continuar" : "Pausar"}
         </button>
         <button
           type="button"

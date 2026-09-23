@@ -6,8 +6,13 @@ import { PlayerToolbar } from "../components/PlayerToolbar";
 import type { EmulatorJSPlayerHandle } from "../components/EmulatorJSPlayer";
 import { PlatformIcon } from "../components/PlatformIcon";
 import { useInputManager } from "../hooks/useInputManager";
-import { loadAudioSettings, loadControlSettings, saveAudioSettings } from "../input/settingsStorage";
-import type { AudioSettings, PlayablePlatform } from "../input/controlTypes";
+import {
+  loadAudioSettings,
+  loadControlSettings,
+  loadQuickActionSettings,
+  saveAudioSettings,
+} from "../input/settingsStorage";
+import type { AudioSettings, PlayablePlatform, QuickActionId, RawKeyboardInput } from "../input/controlTypes";
 import { TouchController } from "../components/controls/TouchController";
 import { ControlsPanel } from "../components/controls/ControlsPanel";
 import { TouchEditor } from "../components/controls/TouchEditor";
@@ -25,9 +30,13 @@ export function Player({ launch, onBack }: PlayerProps) {
   const [playerReady, setPlayerReady] = useState(false);
   const [playerInstance, setPlayerInstance] = useState(0);
   const [n64Core, setN64Core] = useState(emulatorConfig.n64.core);
-  const inputPlatform: PlayablePlatform = launch.platform === "ps2" ? "ps1" : launch.platform;
+  const inputPlatform: PlayablePlatform = launch.platform;
   const [controlSettings, setControlSettings] = useState(() => loadControlSettings(inputPlatform));
   const [audio, setAudio] = useState(loadAudioSettings);
+  const [quickActionSettings, setQuickActionSettings] = useState(loadQuickActionSettings);
+  const audioRef = useRef(audio);
+  const quickActionSettingsRef = useRef(quickActionSettings);
+  const [paused, setPaused] = useState(false);
   const [controlsOpen, setControlsOpen] = useState(false);
   const [touchEditorOpen, setTouchEditorOpen] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -35,13 +44,84 @@ export function Player({ launch, onBack }: PlayerProps) {
   const config = emulatorConfig[launch.platform];
   const { manager, snapshot, handleIframeKeyboard } = useInputManager(inputPlatform, controlSettings, emulatorRef);
 
-  const keyboardCodes = useMemo(() => Object.values(controlSettings.keyboard), [controlSettings.keyboard]);
+  const keyboardCodes = useMemo(
+    () => [...new Set([...Object.values(controlSettings.keyboard), ...Object.values(quickActionSettings)])],
+    [controlSettings.keyboard, quickActionSettings],
+  );
   const effectiveVolume = audio.muted ? 0 : audio.volume;
   const changeAudio = useCallback((next: AudioSettings) => {
+    audioRef.current = next;
     setAudio(next);
     saveAudioSettings(next);
     emulatorRef.current?.setVolume(next.muted ? 0 : next.volume);
   }, []);
+
+  useEffect(() => {
+    quickActionSettingsRef.current = quickActionSettings;
+  }, [quickActionSettings]);
+
+  const togglePause = useCallback(() => {
+    setPaused((current) => {
+      emulatorRef.current?.setPaused(!current);
+      return !current;
+    });
+  }, []);
+
+  const runQuickAction = useCallback((input: RawKeyboardInput) => {
+    const action = (Object.entries(quickActionSettingsRef.current) as [QuickActionId, string][])
+      .find(([, code]) => code === input.code)?.[0];
+    if (!action) return false;
+
+    if (action === "fastForward") {
+      if (launch.platform !== "ps2" && !input.repeat) emulatorRef.current?.setFastForward(input.pressed);
+      return true;
+    }
+    if (!input.pressed || input.repeat) return true;
+
+    if (action === "save" || action === "load") {
+      if (launch.platform === "ps2") {
+        setError("O runtime Play! atual ainda não oferece save states para PlayStation 2.");
+      } else {
+        window.dispatchEvent(new CustomEvent("no-lost-player-command", { detail: action }));
+      }
+    } else if (action === "pause") {
+      togglePause();
+    } else if (action === "mute") {
+      const currentAudio = audioRef.current;
+      if (currentAudio.muted || currentAudio.volume === 0) {
+        const restored = Math.max(0.01, currentAudio.previousVolume || 0.8);
+        changeAudio({ volume: restored, muted: false, previousVolume: restored });
+      } else {
+        changeAudio({ ...currentAudio, muted: true, previousVolume: currentAudio.volume });
+      }
+    } else if (action === "fullscreen") {
+      if (document.fullscreenElement) void document.exitFullscreen();
+      else void playerContainer.current?.requestFullscreen();
+    }
+    return true;
+  }, [changeAudio, launch.platform, togglePause]);
+
+  const handleKeyboardInput = useCallback((input: RawKeyboardInput) => {
+    if (!runQuickAction(input)) handleIframeKeyboard(input);
+  }, [handleIframeKeyboard, runQuickAction]);
+
+  useEffect(() => {
+    const handleQuickKey = (event: KeyboardEvent) => {
+      if (event.metaKey || event.ctrlKey || event.altKey || controlsOpen || touchEditorOpen) return;
+      const target = event.target as HTMLElement | null;
+      if (target?.closest("input, textarea, select, button, [contenteditable=true]")) return;
+      if (!Object.values(quickActionSettings).includes(event.code)) return;
+      event.preventDefault();
+      event.stopPropagation();
+      runQuickAction({ code: event.code, pressed: event.type === "keydown", repeat: event.repeat });
+    };
+    window.addEventListener("keydown", handleQuickKey, true);
+    window.addEventListener("keyup", handleQuickKey, true);
+    return () => {
+      window.removeEventListener("keydown", handleQuickKey, true);
+      window.removeEventListener("keyup", handleQuickKey, true);
+    };
+  }, [controlsOpen, quickActionSettings, runQuickAction, touchEditorOpen]);
 
   useEffect(() => {
     manager.setEnabled(!touchEditorOpen);
@@ -51,6 +131,7 @@ export function Player({ launch, onBack }: PlayerProps) {
   const restartPlayer = () => {
     setError(null);
     setPlayerReady(false);
+    setPaused(false);
     setPlayerInstance((current) => current + 1);
   };
 
@@ -100,27 +181,25 @@ export function Player({ launch, onBack }: PlayerProps) {
           key={`${launch.gameId}-${n64Core}-${playerInstance}`}
           platform={launch.platform}
           romUrl={launch.romUrl}
+          romFile={launch.romFile}
           gameId={launch.gameId}
           gameName={launch.title}
           core={launch.platform === "n64" ? n64Core : undefined}
           volume={effectiveVolume}
           keyboardCodes={keyboardCodes}
-          onKeyboardInput={handleIframeKeyboard}
+          onKeyboardInput={handleKeyboardInput}
           playerRef={emulatorRef}
           onReady={setPlayerReady}
           onError={handleError}
         />
-        {launch.platform !== "ps2" && (
-          <TouchController
-            platform={inputPlatform}
-            settings={controlSettings}
-            snapshot={snapshot}
-            manager={manager}
-            disabled={touchEditorOpen}
-          />
-        )}
-        {launch.platform !== "ps2" && (
-          <div className="mobile-game-menu">
+        <TouchController
+          platform={inputPlatform}
+          settings={controlSettings}
+          snapshot={snapshot}
+          manager={manager}
+          disabled={touchEditorOpen}
+        />
+        <div className="mobile-game-menu">
             <button type="button" className="mobile-game-menu__toggle" onClick={() => setMobileMenuOpen((value) => !value)} aria-label="Menu do jogo">☰</button>
             {mobileMenuOpen && (
               <div className="mobile-game-menu__panel">
@@ -128,8 +207,9 @@ export function Player({ launch, onBack }: PlayerProps) {
                 <VolumeControl audio={audio} onChange={changeAudio} />
                 <button type="button" onClick={() => { setControlsOpen(true); setMobileMenuOpen(false); }}>Controles</button>
                 <button type="button" onClick={() => { setTouchEditorOpen(true); setMobileMenuOpen(false); }}>Editar touch</button>
-                <button type="button" onClick={() => window.dispatchEvent(new CustomEvent("no-lost-player-command", { detail: "save" }))}>Salvar</button>
-                <button type="button" onClick={() => window.dispatchEvent(new CustomEvent("no-lost-player-command", { detail: "load" }))}>Carregar</button>
+                {launch.platform !== "ps2" && <button type="button" onClick={() => window.dispatchEvent(new CustomEvent("no-lost-player-command", { detail: "save" }))}>Salvar</button>}
+                {launch.platform !== "ps2" && <button type="button" onClick={() => window.dispatchEvent(new CustomEvent("no-lost-player-command", { detail: "load" }))}>Carregar</button>}
+                <button type="button" onClick={togglePause}>{paused ? "Continuar" : "Pausar"}</button>
                 <button type="button" onClick={() => { restartPlayer(); setMobileMenuOpen(false); }}>Reiniciar</button>
                 <button type="button" onClick={() => {
                   if (document.fullscreenElement) void document.exitFullscreen();
@@ -139,9 +219,8 @@ export function Player({ launch, onBack }: PlayerProps) {
                 <button type="button" onClick={() => setMobileMenuOpen(false)}>Continuar</button>
               </div>
             )}
-          </div>
-        )}
-        {touchEditorOpen && launch.platform !== "ps2" && (
+        </div>
+        {touchEditorOpen && (
           <TouchEditor
             platform={inputPlatform}
             settings={controlSettings}
@@ -149,18 +228,18 @@ export function Player({ launch, onBack }: PlayerProps) {
             onClose={() => setTouchEditorOpen(false)}
           />
         )}
-        {launch.platform !== "ps2" && (
-          <ControlsPanel
+        <ControlsPanel
             open={controlsOpen}
             currentPlatform={inputPlatform}
             currentSettings={controlSettings}
+            quickActionSettings={quickActionSettings}
             snapshot={snapshot}
             manager={manager}
             onCurrentSettingsChange={setControlSettings}
+            onQuickActionSettingsChange={setQuickActionSettings}
             onClose={() => setControlsOpen(false)}
             onEditTouch={() => { setControlsOpen(false); setTouchEditorOpen(true); }}
-          />
-        )}
+        />
       </div>
 
       <PlayerToolbar
@@ -169,6 +248,7 @@ export function Player({ launch, onBack }: PlayerProps) {
         gameId={launch.gameId}
         platform={launch.platform}
         playerReady={playerReady}
+        paused={paused}
         n64Core={launch.platform === "n64" ? n64Core : undefined}
         onN64CoreChange={launch.platform === "n64" ? (core) => {
           setError(null);
@@ -176,6 +256,7 @@ export function Player({ launch, onBack }: PlayerProps) {
           setN64Core(core);
         } : undefined}
         onRestart={restartPlayer}
+        onTogglePause={togglePause}
         onError={handleError}
         gamepadName={snapshot.gamepadName}
         audio={audio}

@@ -17,7 +17,10 @@ export function TouchEditor({ platform, settings, onChange, onClose }: TouchEdit
   const dragOffset = useRef({ x: 0, y: 0 });
   const config = consoleMappings[platform];
 
-  useEffect(() => setDraft(settings.mobile), [settings.mobile]);
+  useEffect(() => {
+    setDraft(settings.mobile);
+    setSelected("dpad");
+  }, [platform, settings.mobile]);
 
   const update = (id: string, patch: Partial<MobileElementSettings>) => {
     setDraft((current) => ({ ...current, [id]: { ...current[id], ...patch } }));
@@ -33,6 +36,7 @@ export function TouchEditor({ platform, settings, onChange, onClose }: TouchEdit
   };
 
   const beginDrag = (event: ReactPointerEvent, id: string) => {
+    event.preventDefault();
     const element = event.currentTarget as HTMLElement;
     const rect = element.getBoundingClientRect();
     dragOffset.current = { x: event.clientX - (rect.left + rect.width / 2), y: event.clientY - (rect.top + rect.height / 2) };
@@ -43,6 +47,11 @@ export function TouchEditor({ platform, settings, onChange, onClose }: TouchEdit
 
   const labels: Record<string, string> = { dpad: "Direcional", "left-stick": "Analógico esquerdo", "right-stick": "Analógico direito" };
   config.controls.filter((item) => item.kind === "button").forEach((item) => { labels[item.id] = item.label; });
+  const elementIds = [
+    "dpad",
+    ...config.analogs.map((analog) => analog.id),
+    ...config.controls.filter((item) => item.kind === "button").map((item) => item.id),
+  ].filter((id, index, values) => values.indexOf(id) === index && draft[id]);
   const current = draft[selected] ?? { x: 50, y: 50, size: 1, opacity: 0.72, visible: true };
 
   const save = () => {
@@ -62,6 +71,11 @@ export function TouchEditor({ platform, settings, onChange, onClose }: TouchEdit
     <div className="touch-editor" role="dialog" aria-modal="true" aria-label="Editar controles touch">
       <div className="touch-editor__toolbar">
         <div><strong>Editar controles · {config.name}</strong><span>Arraste os elementos dentro da área segura.</span></div>
+        <label>Elemento
+          <select value={selected} onChange={(event) => setSelected(event.target.value)}>
+            {elementIds.map((id) => <option key={id} value={id}>{labels[id] ?? id}</option>)}
+          </select>
+        </label>
         <label>Tamanho<input type="range" min="50" max="180" value={current.size * 100} onChange={(event) => update(selected, { size: Number(event.target.value) / 100 })} /></label>
         <label>Opacidade<input type="range" min="20" max="100" value={current.opacity * 100} onChange={(event) => update(selected, { opacity: Number(event.target.value) / 100 })} /></label>
         <label className="touch-editor__visible"><input type="checkbox" checked={current.visible} onChange={(event) => update(selected, { visible: event.target.checked })} /> Visível</label>

@@ -4,3 +4,5 @@ dist
 .vercel
 *.local
 *.log
+public/emulator/ps2/runtime/
+public/emulator/ps2/play-runtime.json

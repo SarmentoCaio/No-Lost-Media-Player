@@ -10,6 +10,9 @@
       body { font-family: system-ui, sans-serif; color: #d9dce6; }
       #fatal { box-sizing: border-box; display: none; place-content: center; width: 100%; height: 100%; padding: 2rem; text-align: center; }
       #fatal strong { display: block; margin-bottom: .5rem; color: #ff8b8b; }
+      /* O touch é controlado pela aplicação. A barra nativa permanece disponível
+         ao mover o mouse porque concentra cheats e ajustes avançados do core. */
+      .ejs_virtualGamepad_parent { display: none !important; }
     </style>
   </head>
   <body>
@@ -48,6 +51,81 @@
         let desiredVolume = 0.8;
         let externalInputEnabled = false;
         let externalKeyboardCodes = new Set();
+        const masterVolumeGains = new Set();
+        let loadingProgress = 0;
+
+        // O loader do EmulatorJS mostra o progresso real dentro de #game, mas
+        // a interface externa cobre esse elemento. Espelhamos as fases para o
+        // React, mantendo uma porcentagem geral monotônica: runtime, núcleo e ROM.
+        const loadingObserver = new MutationObserver(() => {
+          const game = document.getElementById("game");
+          const text = game?.querySelector(".ejs_loading_text")?.textContent?.replace(/\s+/g, " ").trim() ?? "";
+          if (!text) return;
+          const matches = [...text.matchAll(/(\d{1,3})\s*%/g)];
+          const raw = Math.min(100, Number(matches.at(-1)?.[1] ?? NaN));
+          if (!Number.isFinite(raw)) return;
+
+          let overall = 8 + Math.round(raw * 0.84);
+          if (/(emulador|emulator|núcleo|core)/i.test(text)) overall = 8 + Math.round(raw * 0.37);
+          else if (/(jogo|game|rom)/i.test(text)) overall = 46 + Math.round(raw * 0.47);
+          overall = Math.max(loadingProgress, Math.min(93, overall));
+          if (overall === loadingProgress && raw < 100) return;
+          loadingProgress = overall;
+          notify("loading", text.slice(0, 140), { progress: overall });
+        });
+        loadingObserver.observe(document.getElementById("game"), { childList: true, characterData: true, subtree: true });
+
+        // Alguns cores recriam os GainNodes do OpenAL depois de setVolume(),
+        // fazendo o volume voltar ao máximo. Interceptar apenas conexões feitas
+        // ao destination cria um ganho mestre estável para todo o áudio do core.
+        const installMasterVolume = () => {
+          const prototype = window.AudioNode?.prototype;
+          const originalConnect = prototype?.connect;
+          if (!prototype || typeof originalConnect !== "function" || prototype.__noLostVolumeInstalled) return;
+          Object.defineProperty(prototype, "__noLostVolumeInstalled", { value: true });
+          const gainsByContext = new WeakMap();
+
+          prototype.connect = function(destination, ...args) {
+            const context = this.context;
+            if (context && destination === context.destination) {
+              let master = gainsByContext.get(context);
+              if (!master) {
+                master = context.createGain();
+                master.gain.value = desiredVolume;
+                originalConnect.call(master, context.destination);
+                gainsByContext.set(context, master);
+                masterVolumeGains.add(master);
+                queueMicrotask(() => applyMasterVolume(desiredVolume));
+              }
+              return originalConnect.call(this, master, ...args);
+            }
+            return originalConnect.call(this, destination, ...args);
+          };
+        };
+
+        const applyMasterVolume = (volume) => {
+          desiredVolume = Math.min(1, Math.max(0, Number(volume) || 0));
+          masterVolumeGains.forEach((gain) => {
+            try {
+              gain.gain.cancelScheduledValues(gain.context.currentTime);
+              gain.gain.setValueAtTime(desiredVolume, gain.context.currentTime);
+            } catch {
+              gain.gain.value = desiredVolume;
+            }
+          });
+
+          const emulator = window.EJS_emulator;
+          if (emulator?.setVolume) {
+            // Mantém os ganhos internos em unidade; o ganho mestre aplica o
+            // valor uma única vez e também alcança fontes criadas depois.
+            emulator.setVolume(masterVolumeGains.size ? 1 : desiredVolume);
+            emulator.volume = desiredVolume;
+            emulator.muted = desiredVolume === 0;
+          }
+          if (desiredVolume > 0) emulator?.Module?.AL?.currentCtx?.audioCtx?.resume?.().catch?.(() => undefined);
+        };
+
+        installMasterVolume();
 
         const shutdownEmulator = () => {
           const emulator = window.EJS_emulator;
@@ -56,7 +134,7 @@
 
           // Silencia imediatamente e encerra o loop antes que o documento suma.
           // pagehide também cobre fechamento de aba e navegação com bfcache.
-          try { emulator.setVolume?.(0); } catch (error) { console.warn(error); }
+          try { applyMasterVolume(0); } catch (error) { console.warn(error); }
           try { emulator.pause?.(true); } catch (error) { console.warn(error); }
           try { emulator.gameManager?.toggleMainLoop?.(0); } catch (error) { console.warn(error); }
           try { emulator.Module?.AL?.currentCtx?.audioCtx?.suspend?.(); } catch (error) { console.warn(error); }
@@ -135,7 +213,7 @@
           const supportsWebGl2 = Boolean(document.createElement("canvas").getContext("webgl2"));
           if (!supportsWebGl2) {
             core = "parallel_n64";
-            notify("loading", "Usando o núcleo N64 de compatibilidade…");
+            notify("loading", "Usando o núcleo N64 de compatibilidade…", { progress: 18 });
           }
         }
 
@@ -161,14 +239,25 @@
           }
 
           if (data.type === "set-volume") {
-            desiredVolume = Math.min(1, Math.max(0, Number(data.volume) || 0));
+            applyMasterVolume(data.volume);
+            return;
+          }
+
+          if (data.type === "set-fast-forward") {
             const emulator = window.EJS_emulator;
-            if (emulator?.setVolume) {
-              emulator.volume = desiredVolume;
-              emulator.muted = desiredVolume === 0;
-              emulator.setVolume(desiredVolume);
-              if (desiredVolume > 0) emulator.Module?.AL?.currentCtx?.audioCtx?.resume?.().catch?.(() => undefined);
-            }
+            if (!emulator?.gameManager) return;
+            const active = data.active === true;
+            emulator.gameManager.setFastForwardRatio?.(2);
+            emulator.gameManager.toggleFastForward?.(active ? 1 : 0);
+            emulator.isFastForward = active;
+            return;
+          }
+
+          if (data.type === "set-paused") {
+            const emulator = window.EJS_emulator;
+            if (!emulator?.gameManager) return;
+            if (data.paused === true) emulator.pause?.(true);
+            else emulator.play?.(true);
             return;
           }
 
@@ -271,7 +360,7 @@
         });
 
         const start = () => {
-          notify("loading", "Carregando EmulatorJS…");
+          notify("loading", "Carregando o runtime do console…", { progress: 4 });
           window.EJS_player = "#game";
           window.EJS_core = core;
           window.EJS_gameUrl = rom;
@@ -314,7 +403,26 @@
           window.EJS_startOnLoaded = true;
           window.EJS_backgroundColor = "#050609";
           window.EJS_color = "#8b6cff";
+          // A barra externa já oferece estas ações com a identidade visual do
+          // app. Mantemos na barra nativa apenas recursos exclusivos, como
+          // cheats, ajustes avançados, opções do core, discos e saves .sav.
+          window.EJS_Buttons = {
+            playPause: false,
+            restart: false,
+            mute: false,
+            unmute: false,
+            volumeSlider: false,
+            fullscreen: false,
+            saveState: false,
+            loadState: false,
+            quickSave: false,
+            quickLoad: false,
+            gamepad: false,
+            netplay: false,
+            exitEmulation: false,
+          };
           window.EJS_onGameStart = () => {
+            loadingObserver.disconnect();
             const emulator = window.EJS_emulator;
             emulator.toggleVirtualGamepad?.(false);
             if (emulator.virtualGamepad) emulator.virtualGamepad.style.setProperty("display", "none", "important");
@@ -322,8 +430,7 @@
             // Evita que o polling nativo injete uma segunda entrada em paralelo
             // com o InputManager da aplicação.
             if (externalInputEnabled) emulator.gamepad?.terminate?.();
-            emulator.volume = desiredVolume;
-            emulator.setVolume?.(desiredVolume);
+            applyMasterVolume(desiredVolume);
             notify("ready", "Jogo iniciado");
             syncPageVisibility();
           };
@@ -332,7 +439,7 @@
           loader.src = `${window.EJS_pathtodata}loader.js`;
           loader.async = true;
           loader.onload = () => {
-            notify("loading", "Runtime carregado. Iniciando o jogo…");
+            notify("loading", "Runtime carregado. Baixando núcleo e jogo…", { progress: 8 });
           };
           loader.onerror = () => {
             fail("Não foi possível baixar o EmulatorJS. Verifique sua conexão com a internet.");

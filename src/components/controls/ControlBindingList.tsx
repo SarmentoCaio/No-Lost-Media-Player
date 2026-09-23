@@ -1,5 +1,7 @@
 import { formatGamepad, formatKey } from "../../input/consoleMappings";
 import type { ConsoleControlConfig, PlatformControlSettings } from "../../input/controlTypes";
+import type { QuickActionId, QuickActionSettings } from "../../input/controlTypes";
+import { QuickActionList } from "./QuickActionList";
 
 interface ControlBindingListProps {
   config: ConsoleControlConfig;
@@ -7,9 +9,21 @@ interface ControlBindingListProps {
   listeningAction: string | null;
   listeningKind: "keyboard" | "gamepad" | null;
   onListen: (action: string, kind: "keyboard" | "gamepad") => void;
+  quickActionSettings: QuickActionSettings;
+  listeningQuickAction: QuickActionId | null;
+  onListenQuickAction: (action: QuickActionId) => void;
 }
 
-export function ControlBindingList({ config, settings, listeningAction, listeningKind, onListen }: ControlBindingListProps) {
+export function ControlBindingList({
+  config,
+  settings,
+  listeningAction,
+  listeningKind,
+  onListen,
+  quickActionSettings,
+  listeningQuickAction,
+  onListenQuickAction,
+}: ControlBindingListProps) {
   return (
     <div className="binding-list">
       <div className="binding-list__head"><span>Controle</span><span>Teclado</span><span>Gamepad</span></div>
@@ -27,6 +41,12 @@ export function ControlBindingList({ config, settings, listeningAction, listenin
           </div>
         );
       })}
+      <QuickActionList
+        settings={quickActionSettings}
+        listeningAction={listeningQuickAction}
+        onListen={onListenQuickAction}
+        compact
+      />
     </div>
   );
 }

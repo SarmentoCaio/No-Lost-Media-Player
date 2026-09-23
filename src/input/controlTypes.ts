@@ -1,6 +1,6 @@
 import type { Platform } from "../types/game";
 
-export type PlayablePlatform = Exclude<Platform, "ps2">;
+export type PlayablePlatform = Platform;
 export type ControlKind = "button" | "dpad" | "analog";
 
 export interface GamepadButtonBinding {
@@ -64,6 +64,10 @@ export interface AudioSettings {
   muted: boolean;
   previousVolume: number;
 }
+
+export type QuickActionId = "fastForward" | "save" | "load" | "pause" | "mute" | "fullscreen";
+
+export type QuickActionSettings = Record<QuickActionId, string>;
 
 export interface InputSnapshot {
   values: Readonly<Record<string, number>>;

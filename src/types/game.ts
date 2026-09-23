@@ -13,5 +13,6 @@ export interface PlayerLaunch {
   title: string;
   platform: Platform;
   romUrl: string;
+  romFile?: File;
   source: "url" | "local";
 }

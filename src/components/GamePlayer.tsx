@@ -7,6 +7,7 @@ import type { RawKeyboardInput } from "../input/controlTypes";
 interface GamePlayerProps {
   platform: Platform;
   romUrl: string;
+  romFile?: File;
   gameId: string;
   gameName?: string;
   core?: string;
@@ -21,6 +22,7 @@ interface GamePlayerProps {
 export function GamePlayer({
   platform,
   romUrl,
+  romFile,
   gameId,
   gameName = "Jogo",
   core,
@@ -32,7 +34,18 @@ export function GamePlayer({
   onError = () => undefined,
 }: GamePlayerProps) {
   if (platform === "ps2") {
-    return <PS2Player romUrl={romUrl} gameName={gameName} />;
+    return (
+      <PS2Player
+        ref={playerRef}
+        romUrl={romUrl}
+        romFile={romFile}
+        gameName={gameName}
+        volume={volume}
+        onKeyboardInput={onKeyboardInput}
+        onReady={onReady}
+        onError={onError}
+      />
+    );
   }
 
   return (

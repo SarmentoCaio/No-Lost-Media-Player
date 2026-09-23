@@ -1,5 +1,11 @@
 import { consoleMappings, defaultMobileSettings } from "./consoleMappings";
-import type { AudioSettings, GamepadBinding, PlatformControlSettings, PlayablePlatform } from "./controlTypes";
+import type {
+  AudioSettings,
+  GamepadBinding,
+  PlatformControlSettings,
+  PlayablePlatform,
+  QuickActionSettings,
+} from "./controlTypes";
 
 const STORAGE_KEY = "no-lost-media.settings.v2";
 
@@ -7,15 +13,29 @@ interface StoredSettings {
   version: 2;
   audio: AudioSettings;
   controls: Partial<Record<PlayablePlatform, Partial<PlatformControlSettings>>>;
+  quickActions?: Partial<QuickActionSettings>;
 }
 
 const defaultAudio: AudioSettings = { volume: 0.8, muted: false, previousVolume: 0.8 };
+export const defaultQuickActions: QuickActionSettings = {
+  fastForward: "Space",
+  save: "F5",
+  load: "F9",
+  pause: "KeyP",
+  mute: "KeyM",
+  fullscreen: "F11",
+};
 
 function readSettings(): StoredSettings {
   try {
     const parsed = JSON.parse(localStorage.getItem(STORAGE_KEY) ?? "null") as Partial<StoredSettings> | null;
     if (parsed?.version === 2) {
-      return { version: 2, audio: { ...defaultAudio, ...parsed.audio }, controls: parsed.controls ?? {} };
+      return {
+        version: 2,
+        audio: { ...defaultAudio, ...parsed.audio },
+        controls: parsed.controls ?? {},
+        quickActions: parsed.quickActions ?? {},
+      };
     }
   } catch {
     // Configuração inválida ou armazenamento indisponível: usa padrões seguros.
@@ -75,4 +95,19 @@ export function saveAudioSettings(audio: AudioSettings) {
   const settings = readSettings();
   settings.audio = audio;
   writeSettings(settings);
+}
+
+export function loadQuickActionSettings(): QuickActionSettings {
+  return { ...defaultQuickActions, ...readSettings().quickActions };
+}
+
+export function saveQuickActionSettings(quickActions: QuickActionSettings) {
+  const settings = readSettings();
+  settings.quickActions = quickActions;
+  writeSettings(settings);
+}
+
+export function resetQuickActionSettings(): QuickActionSettings {
+  saveQuickActionSettings(defaultQuickActions);
+  return { ...defaultQuickActions };
 }

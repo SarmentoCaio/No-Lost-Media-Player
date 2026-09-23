@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { emulatorConfig } from "../emulators/emulatorConfig";
 import type { Platform, PlayerLaunch } from "../types/game";
-import { isSupportedRom, slugify, titleFromRom, validateRemoteRomUrl } from "../utils/rom";
+import { getFileExtension, isSupportedRom, slugify, titleFromRom, validateRemoteRomUrl } from "../utils/rom";
 import { PlatformSelector } from "../components/PlatformSelector";
 import { RomSelector } from "../components/RomSelector";
 
@@ -35,6 +35,7 @@ export function Home({ onStart }: HomeProps) {
         title,
         platform,
         romUrl: URL.createObjectURL(file),
+        romFile: file,
         source: "local",
       });
       return;
@@ -43,6 +44,11 @@ export function Home({ onStart }: HomeProps) {
     const validationError = validateRemoteRomUrl(romUrl);
     if (validationError) {
       setError(validationError);
+      return;
+    }
+    const remoteExtension = getFileExtension(romUrl);
+    if (platform === "ps2" && remoteExtension && !isSupportedRom(romUrl, platform)) {
+      setError(`O Play! precisa da imagem de disco descompactada. O formato ${remoteExtension} não é aceito; use ${emulatorConfig.ps2.extensionLabel}.`);
       return;
     }
     const title = titleFromRom(romUrl, emulatorConfig[platform].name);
@@ -78,21 +84,28 @@ export function Home({ onStart }: HomeProps) {
       </section>
 
       {platform && (
-        <RomSelector
-          platform={platform}
-          url={romUrl}
-          selectedFile={file}
-          error={error}
-          onUrlChange={(value) => {
-            setRomUrl(value);
-            setError(null);
-          }}
-          onFileChange={(selectedFile) => {
-            setFile(selectedFile);
-            setError(null);
-          }}
-          onStart={startGame}
-        />
+        <>
+          {platform === "ps2" && (
+            <p className="platform-beta-notice">
+              PS2 está em beta: requer WebGL 2 e um navegador moderno. Imagens de disco grandes são lidas em partes quando o servidor aceita HTTP Range.
+            </p>
+          )}
+          <RomSelector
+            platform={platform}
+            url={romUrl}
+            selectedFile={file}
+            error={error}
+            onUrlChange={(value) => {
+              setRomUrl(value);
+              setError(null);
+            }}
+            onFileChange={(selectedFile) => {
+              setFile(selectedFile);
+              setError(null);
+            }}
+            onStart={startGame}
+          />
+        </>
       )}
 
       <footer className="site-footer">
