@@ -56,9 +56,13 @@ A URL precisa apontar diretamente para a ROM e o servidor remoto precisa autoriz
 
 ## CORS e erros de carregamento
 
-Antes de inicializar uma ROM remota, o iframe faz uma requisição curta de verificação. Se o servidor não enviar um cabeçalho `Access-Control-Allow-Origin` compatível, a aplicação informa: “O servidor da ROM não permite carregamento por outro domínio.”
+O servidor do Internet Archive (`archive.org`) responde a requisições de download com redirecionamento `HTTP 302 Found` e nós de CDN que não enviam cabeçalhos `Access-Control-Allow-Origin`, impedindo o `fetch()` direto do navegador devido às restrições de CORS e `Cross-Origin-Embedder-Policy: require-corp`.
 
-O projeto não inclui nem cria um proxy, não tenta contornar CORS e não baixa ROMs para o servidor. Outros erros amigáveis cobrem URL inexistente, falha de conexão, runtime indisponível e formato incompatível. Alguns bloqueadores de conteúdo podem impedir o acesso a `cdn.emulatorjs.org`.
+Para resolver isso de forma transparente e independente, o **No Lost Media Player** conta com um endpoint de proxy de streaming (`/api/proxy`):
+- **Desenvolvimento local:** Integrado diretamente ao Vite (`vite.config.ts`), interceptando requisições para `/api/proxy` e fazendo o repasse com streaming, seguindo redirects e preservando cabeçalhos `Range` (`206 Partial Content`).
+- **Produção (Vercel):** Implementado como Vercel Edge Function (`api/proxy.ts`), distribuído globalmente com baixíssima latência e sem limites de timeout do plano Hobby.
+- As URLs do `archive.org` são detectadas e roteadas automaticamente pelo proxy (`resolvePlayableRomUrl`), garantindo que tanto ao clicar em "Jogar" no catálogo quanto ao colar uma URL manual na Home, o jogo carregue imediatamente sem erros de CORS.
+- Bloqueadores de conteúdo ainda podem interferir com `cdn.emulatorjs.org` caso possuam listas muito restritivas.
 
 ## Arquitetura
 

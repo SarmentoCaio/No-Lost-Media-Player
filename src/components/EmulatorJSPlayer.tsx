@@ -1,5 +1,6 @@
 import { forwardRef, useEffect, useImperativeHandle, useMemo, useRef, useState } from "react";
 import { emulatorConfig } from "../emulators/emulatorConfig";
+import { resolvePlayableRomUrl } from "../utils/rom";
 import type { Platform } from "../types/game";
 import type { RawKeyboardInput } from "../input/controlTypes";
 
@@ -68,7 +69,7 @@ export const EmulatorJSPlayer = forwardRef<EmulatorJSPlayerHandle, EmulatorJSPla
   const emulatorUrl = useMemo(() => {
     const parameters = new URLSearchParams({
       core: core ?? emulatorConfig[platform].core,
-      rom: romUrl,
+      rom: resolvePlayableRomUrl(romUrl),
       name: gameName,
       gameId: String(numericGameId),
       netplayServer,

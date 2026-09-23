@@ -3,6 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <link rel="preconnect" href="https://cdn.emulatorjs.org" crossorigin />
     <title>EmulatorJS</title>
     <style>
@@ -39,7 +40,7 @@
 
         const params = new URLSearchParams(window.location.search);
         let core = params.get("core");
-        const rom = params.get("rom");
+        let rom = params.get("rom");
         const name = params.get("name") || "Jogo";
         const gameId = Number(params.get("gameId"));
         const netplayServer = params.get("netplayServer");
@@ -114,6 +115,11 @@
         if (!core || !rom) {
           fail("Os parâmetros do emulador estão incompletos.");
           return;
+        }
+
+        // Se a ROM for do Archive.org e ainda não foi roteada pelo proxy, converte automaticamente
+        if (/^https?:\/\/(?:[a-z0-9-]+\.)*archive\.org\//i.test(rom)) {
+          rom = `/api/proxy?url=${encodeURIComponent(rom)}`;
         }
 
         if (/^https?:/i.test(rom)) {
