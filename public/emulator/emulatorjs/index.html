@@ -123,7 +123,7 @@
           while (cleanRom.includes("%25")) {
             try { cleanRom = decodeURIComponent(cleanRom); } catch { break; }
           }
-          rom = `/api/proxy?url=${encodeURIComponent(cleanRom)}&v=2`;
+          rom = `/api/proxy?url=${encodeURIComponent(cleanRom)}&v=3`;
         }
 
         if (/^https?:/i.test(rom)) {

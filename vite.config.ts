@@ -116,11 +116,7 @@ function handleProxyRequest(req: IncomingMessage, res: ServerResponse): boolean 
     );
     res.setHeader("Cross-Origin-Resource-Policy", "cross-origin");
 
-    if (upstreamResponse.status >= 200 && upstreamResponse.status < 300) {
-      res.setHeader("Cache-Control", "public, max-age=2592000, immutable");
-    } else {
-      res.setHeader("Cache-Control", "no-cache, no-store, must-revalidate");
-    }
+    res.setHeader("Cache-Control", "no-cache, no-transform");
 
     const contentType = upstreamResponse.headers.get("content-type");
     if (contentType) res.setHeader("Content-Type", contentType);
@@ -139,12 +135,31 @@ function handleProxyRequest(req: IncomingMessage, res: ServerResponse): boolean 
       return;
     }
 
+    if (typeof res.flushHeaders === "function") {
+      res.flushHeaders();
+    }
+
     if (upstreamResponse.body) {
       const nodeStream = Readable.fromWeb(upstreamResponse.body as any);
-      nodeStream.pipe(res);
+
+      nodeStream.on("error", () => {
+        if (!res.headersSent) {
+          res.statusCode = 502;
+          res.end(JSON.stringify({ error: "Erro de streaming do acervo remoto." }));
+        } else {
+          res.destroy();
+        }
+      });
+
+      res.on("error", () => {
+        nodeStream.destroy();
+      });
+
       req.on("close", () => {
         nodeStream.destroy();
       });
+
+      nodeStream.pipe(res);
     } else {
       res.end();
     }

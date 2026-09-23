@@ -62,8 +62,8 @@ export const emulatorConfig: Record<Platform, EmulatorPlatformConfig> = {
     // PCSX-ReARMed usa uma BIOS HLE quando o usuário não fornece uma BIOS real.
     // O antigo mednafen_psx_hw interrompia a inicialização pedindo scph5500.bin.
     core: "pcsx_rearmed",
-    extensions: [".chd", ".bin", ".cue", ".pbp"],
-    extensionLabel: ".chd, .bin/.cue ou .pbp",
+    extensions: [".chd", ".bin", ".cue", ".pbp", ".zip"],
+    extensionLabel: ".chd, .bin/.cue, .pbp ou .zip",
     accent: "#67b8ff",
     accentSecondary: "#f15b6c",
     manufacturer: "Sony Computer Entertainment",

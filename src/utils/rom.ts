@@ -103,7 +103,7 @@ export function resolvePlayableRomUrl(url: string): string {
     }
   }
   if (isArchiveOrgUrl(trimmed)) {
-    return `/api/proxy?url=${encodeURIComponent(trimmed)}&v=2`;
+    return `/api/proxy?url=${encodeURIComponent(trimmed)}&v=3`;
   }
   return trimmed;
 }
