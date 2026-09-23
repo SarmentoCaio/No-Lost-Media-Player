@@ -194,6 +194,79 @@
           return;
         }
 
+        // Se a ROM for do Archive.org e ainda não foi roteada pelo proxy, converte automaticamente
+        if (/^https?:\/\/(?:[a-z0-9-]+\.)*archive\.org\//i.test(rom)) {
+          let cleanRom = rom;
+          while (cleanRom.includes("%25")) {
+            try { cleanRom = decodeURIComponent(cleanRom); } catch { break; }
+          }
+          let cleanFileName = "rom.zip";
+          try {
+            const parsed = new URL(cleanRom);
+            const last = parsed.pathname.split("/").filter(Boolean).pop();
+            if (last) cleanFileName = decodeURIComponent(last);
+          } catch {
+            // fallback
+          }
+          rom = `/api/rom?v=3&url=${encodeURIComponent(cleanRom)}#/${encodeURIComponent(cleanFileName)}`;
+        } else if ((rom.includes("/api/rom") || rom.includes("/api/proxy")) && !rom.includes("#/")) {
+          try {
+            const parsed = new URL(rom, window.location.origin);
+            const targetUrl = parsed.searchParams.get("url");
+            if (targetUrl) {
+              const targetParsed = new URL(targetUrl);
+              const last = targetParsed.pathname.split("/").filter(Boolean).pop();
+              if (last) {
+                rom = `${rom}#/${encodeURIComponent(decodeURIComponent(last))}`;
+              }
+            }
+          } catch {
+            // fallback
+          }
+        }
+
+        // Interceptador para garantir descompactação de qualquer ROM em arquivo .zip/.7z/.rar
+        let _internalEmulator = null;
+        Object.defineProperty(window, "EJS_emulator", {
+          configurable: true,
+          enumerable: true,
+          get: () => _internalEmulator,
+          set: (instance) => {
+            _internalEmulator = instance;
+            if (instance && instance.storageCache && typeof instance.storageCache.download === "function") {
+              const originalDownload = instance.storageCache.download.bind(instance.storageCache);
+              instance.storageCache.download = function (
+                url,
+                type,
+                onProgress,
+                onComplete,
+                timeout,
+                responseType,
+                forceExtract,
+                dontCache,
+                dontExtract,
+              ) {
+                let shouldExtract = forceExtract;
+                const lower = String(url || "").toLowerCase();
+                if (lower.includes(".zip") || lower.includes(".7z") || lower.includes(".rar")) {
+                  shouldExtract = true;
+                }
+                return originalDownload(
+                  url,
+                  type,
+                  onProgress,
+                  onComplete,
+                  timeout,
+                  responseType,
+                  shouldExtract,
+                  dontCache,
+                  dontExtract,
+                );
+              };
+            }
+          },
+        });
+
         if (/^https?:/i.test(rom)) {
           try {
             const romConnection = document.createElement("link");
