@@ -3,7 +3,7 @@ import type { Platform } from "../types/game";
 
 export function getFileExtension(fileName: string): string {
   let effective = fileName;
-  if (fileName.includes("/api/proxy?url=")) {
+  if (fileName.includes("/api/proxy")) {
     try {
       const base = typeof window !== "undefined" ? window.location.origin : "http://localhost";
       const parsed = new URL(fileName, base);
@@ -39,7 +39,7 @@ export function validateRemoteRomUrl(value: string): string | null {
 
 export function titleFromRom(sourceName: string, fallback: string): string {
   let effectiveSource = sourceName;
-  if (sourceName.includes("/api/proxy?url=")) {
+  if (sourceName.includes("/api/proxy")) {
     try {
       const base = typeof window !== "undefined" ? window.location.origin : "http://localhost";
       const parsed = new URL(sourceName, base);
@@ -70,7 +70,7 @@ export function slugify(value: string): string {
 }
 
 export function isProxiedRomUrl(url: string): boolean {
-  return url.startsWith("/api/proxy") || url.includes("/api/proxy?url=");
+  return url.startsWith("/api/proxy") || url.includes("/api/proxy");
 }
 
 export function isArchiveOrgUrl(url: string): boolean {
@@ -103,7 +103,17 @@ export function resolvePlayableRomUrl(url: string): string {
     }
   }
   if (isArchiveOrgUrl(trimmed)) {
-    return `/api/proxy?url=${encodeURIComponent(trimmed)}&v=3`;
+    let cleanFileName = "rom.zip";
+    try {
+      const parsed = new URL(trimmed);
+      const last = parsed.pathname.split("/").filter(Boolean).pop();
+      if (last) {
+        cleanFileName = decodeURIComponent(last);
+      }
+    } catch {
+      // fallback
+    }
+    return `/api/proxy?v=3&url=${encodeURIComponent(trimmed)}#/${encodeURIComponent(cleanFileName)}`;
   }
   return trimmed;
 }
